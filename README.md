@@ -70,6 +70,8 @@ python tools/verify_project.py --artifacts
 
 开发和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段版本见 [CHANGELOG.md](CHANGELOG.md)，第三方来源见 [授权文件索引](docs/THIRD_PARTY_NOTICES.md)。GitHub Actions 只做源码静态检查，Keil 完整编译在已安装工具链的 Windows 上执行。
 
+USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
+
 后续修改 `Firmware/`。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 
 本基线保留参考固件的完整功能和 73 个活动编译输入，不是空白 HAL 工程。新增功能前先验证原板基本功能。原始 `.ioc` 保存在 `MiniBalan/`；直接用 CubeMX 覆盖新工程可能丢失手工驱动、源码组和参数分区，需要单独比对生成结果。

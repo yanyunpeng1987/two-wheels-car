@@ -75,7 +75,8 @@ static USBH_StatusTypeDef USBH_HID_InterfaceInit(USBH_HandleTypeDef *phost)
     } else if (phost->device.CfgDesc.Itf_Desc[interface].bInterfaceProtocol  == HID_MOUSE_BOOT_CODE) {
         USBH_UsrLog("Mouse device found!");
         HID_Handle->Init = USBH_HID_MouseInit;
-    } else if((phost->device.DevDesc.idProduct == 0x0526 || phost->device.DevDesc.idProduct == 0x0575) && phost->device.DevDesc.idVendor == 0x2563) {
+    } else if (phost->device.CfgDesc.Itf_Desc[interface].bInterfaceProtocol == 0U) {
+        /* No VID/PID allowlist: receivers must still use the existing report layout. */
         USBH_UsrLog("USB Wireless Gamepad found!");
         HID_Handle->Init = USBH_HID_GamepadInit;
 
@@ -321,6 +322,17 @@ static USBH_StatusTypeDef USBH_HID_Process(USBH_HandleTypeDef *phost)
                 XferSize = USBH_LL_GetLastXferSize(phost, HID_Handle->InPipe);
 
                 if ((HID_Handle->DataReady == 0U) && (XferSize != 0U)) {
+                    if (HID_Handle->Init == USBH_HID_GamepadInit) {
+                        /* Reject incomplete axis/button fields and impossible transfer sizes. */
+                        if ((XferSize < 8U) || (XferSize > HID_Handle->length)) {
+                            HID_Handle->DataReady = 1U;
+                            break;
+                        }
+                        /* FIFO frames retain a fixed size; never reuse a short report's tail. */
+                        if (XferSize < HID_Handle->length) {
+                            USBH_memset(HID_Handle->pData + XferSize, 0, HID_Handle->length - XferSize);
+                        }
+                    }
                     USBH_HID_FifoWrite(&HID_Handle->fifo, HID_Handle->pData, HID_Handle->length);
                     HID_Handle->DataReady = 1U;
                     USBH_HID_EventCallback(phost);
@@ -437,7 +449,7 @@ HID_TypeTypeDef HIWONDER_USBH_HID_GetDeviceType(USBH_HandleTypeDef *phost)
         } else if (InterfaceProtocol == HID_MOUSE_BOOT_CODE) {
             type = HID_MOUSE;
         } else {
-            if((phost->device.DevDesc.idProduct == 0x0526 || phost->device.DevDesc.idProduct == 0x0575) && phost->device.DevDesc.idVendor == 0x2563) {
+            if (InterfaceProtocol == 0U) {
                 type = (HID_TypeTypeDef)HID_GAMEPAD;
             }
         }

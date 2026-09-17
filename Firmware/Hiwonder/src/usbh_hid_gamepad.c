@@ -73,12 +73,12 @@ static USBH_StatusTypeDef USBH_HID_GamepadDecode(USBH_HandleTypeDef *phost)
 {
     HID_HandleTypeDef *HID_Handle = (HID_HandleTypeDef *) phost->pActiveClass->pData;
 
-    if (HID_Handle->length == 0U) {
+    if ((HID_Handle->length < 8U) || (HID_Handle->length > sizeof(gamepad_report_data))) {
         return USBH_FAIL;
     }
     /*Fill report */
     if (USBH_HID_FifoRead(&HID_Handle->fifo, &gamepad_report_data, HID_Handle->length) ==  HID_Handle->length) {
-		if(gamepad_report_data[20] == 0x02) {
+		if ((HID_Handle->length > 20U) && (gamepad_report_data[20] == 0x02)) {
 			return USBH_FAIL;
 		}
         /*Decode report */

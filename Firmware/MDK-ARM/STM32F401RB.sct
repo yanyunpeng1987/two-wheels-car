@@ -1,0 +1,23 @@
+; *************************************************************
+; BalanceCar STM32F401RB: 128 KiB Flash, 64 KiB RAM.
+; Reserve Sector 1 (0x08004000..0x08007FFF) for PID parameters.
+; This file is maintained explicitly; do not auto-generate it.
+; *************************************************************
+
+LR_IROM1 0x08000000 0x00004000  {    ; load region size_region
+  ER_IROM1 0x08000000 0x00004000  {  ; load address = execution address
+   *.o (RESET, +First)
+   *(InRoot$$Sections)
+   .ANY (+RO)
+   .ANY (+XO)
+  }
+  RW_IRAM1 0x20000000 0x00010000  {  ; RW data
+   .ANY (+RW +ZI)
+  }
+}
+
+LR_IROM2 0x08008000 0x00018000  {
+  ER_IROM2 0x08008000 0x00018000  {  ; load address = execution address
+   .ANY (+RO)
+  }
+}

@@ -1,0 +1,24 @@
+# Original vendor package stays local; Firmware is the maintained source tree.
+/MiniBalan/
+
+# Generated firmware and local IDE state
+Firmware/build/
+*.uvguix.*
+*.uvoptx
+**/JLinkLog.txt
+**/JLinkSettings.ini
+**/DebugConfig/
+**/RTE/
+__pycache__/
+*.pyc
+
+# Local credentials, tool overrides and private notes
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+tools/*.local.*
+
+# Temporary verification checkouts
+/build/

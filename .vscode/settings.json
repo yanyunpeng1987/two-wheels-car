@@ -1,0 +1,16 @@
+{
+  "files.autoGuessEncoding": true,
+  "files.candidateGuessEncodings": ["utf8", "gbk"],
+  "files.readonlyInclude": { "MiniBalan/**": true },
+  "files.associations": { "*.h": "c" },
+  "files.exclude": {
+    "**/*.uvguix.*": true,
+    "**/__pycache__": true
+  },
+  "search.exclude": {
+    "MiniBalan/**": true,
+    "Firmware/build/**": true
+  },
+  "C_Cpp.default.configurationProvider": "",
+  "cmake.configureOnOpen": false
+}

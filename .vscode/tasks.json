@@ -1,0 +1,80 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Firmware: Build",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Project: Sync IntelliSense", "Keil: Build", "Project: Verify firmware"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: Rebuild",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Project: Sync IntelliSense", "Keil: Rebuild", "Project: Verify firmware"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Keil: Build",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/build.ps1", "-Action", "Build"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": {
+        "owner": "armclang",
+        "fileLocation": ["relative", "${workspaceFolder}/Firmware/MDK-ARM"],
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+)\\):\\s+(warning|error):\\s+(.*)$",
+          "file": 1, "line": 2, "severity": 3, "message": 4
+        }
+      }
+    },
+    {
+      "label": "Keil: Rebuild",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/build.ps1", "-Action", "Rebuild"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": {
+        "owner": "armclang",
+        "fileLocation": ["relative", "${workspaceFolder}/Firmware/MDK-ARM"],
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+)\\):\\s+(warning|error):\\s+(.*)$",
+          "file": 1, "line": 2, "severity": 3, "message": 4
+        }
+      }
+    },
+    {
+      "label": "Keil: Check environment",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/build.ps1", "-Action", "Check"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Keil: Open IDE",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/build.ps1", "-Action", "Open"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Project: Sync IntelliSense",
+      "type": "process",
+      "command": "python",
+      "args": ["${workspaceFolder}/tools/sync_vscode.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Project: Verify firmware",
+      "type": "process",
+      "command": "python",
+      "args": ["${workspaceFolder}/tools/verify_project.py", "--artifacts"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+name: Source checks
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-checks:
+    name: Source checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify project references and memory layout
+        run: python3 tools/verify_project.py
+      - name: Validate tool syntax and JSON files
+        run: |
+          python3 - <<'PY'
+          import ast
+          import json
+          from pathlib import Path
+          for path in Path('tools').glob('*.py'):
+              ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
+          paths = [*Path('.vscode').glob('*.json'), *Path('docs').glob('*.json'), Path('BalanceCar.code-workspace')]
+          for path in paths:
+              json.loads(path.read_text(encoding='utf-8-sig'))
+          print('Python syntax and repository JSON checks passed.')
+          PY

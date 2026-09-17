@@ -32,7 +32,7 @@ extern USBH_ClassTypeDef  HIWONDER_HID_CLASS;
 #define HID_GAMEPAD 0x00
 
 
-HID_TypeTypeDef HIWONDER_USBH_HID_GetDeviceType(USBH_HandleTypeDef *phost)
+HID_TypeTypeDef HIWONDER_USBH_HID_GetDeviceType(USBH_HandleTypeDef *phost);
 
 
 #endif

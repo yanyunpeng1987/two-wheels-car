@@ -21,6 +21,18 @@ jobs:
           persist-credentials: false
       - name: Verify project references and memory layout
         run: python3 tools/verify_project.py
+      - name: Execute gamepad report and adapter regression tests
+        run: |
+          mkdir -p build/tests
+          gcc -std=c99 -Wall -Wextra -Werror -pedantic \
+            -IFirmware/Hiwonder/src Firmware/Hiwonder/src/gamepad_report.c \
+            tests/gamepad_report_test.c -o build/tests/gamepad_report_test
+          ./build/tests/gamepad_report_test
+          gcc -std=c99 -Wall -Wextra -Werror -pedantic \
+            -Itests/stubs -IFirmware/Hiwonder/src \
+            Firmware/Hiwonder/src/gamepad_report.c Firmware/Hiwonder/src/usbh_hid_gamepad.c \
+            tests/gamepad_usb_adapter_test.c -o build/tests/gamepad_usb_adapter_test
+          ./build/tests/gamepad_usb_adapter_test
       - name: Validate tool syntax and JSON files
         run: |
           python3 - <<'PY'
@@ -29,7 +41,7 @@ jobs:
           from pathlib import Path
           for path in Path('tools').glob('*.py'):
               ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
-          paths = [*Path('.vscode').glob('*.json'), *Path('docs').glob('*.json'), Path('BalanceCar.code-workspace')]
+          paths = [*Path('.vscode').glob('*.json'), *Path('docs').rglob('*.json'), Path('BalanceCar.code-workspace')]
           for path in paths:
               json.loads(path.read_text(encoding='utf-8-sig'))
           print('Python syntax and repository JSON checks passed.')

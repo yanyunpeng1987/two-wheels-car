@@ -25,6 +25,7 @@
 #include "usbh_hid.h"
 
 /* USER CODE BEGIN Includes */
+#include "usbh_hid_gamepad.h"
 
 /* USER CODE END Includes */
 
@@ -119,6 +120,7 @@ static void USBH_UserProcess  (USBH_HandleTypeDef *phost, uint8_t id)
   break;
 
   case HOST_USER_DISCONNECTION:
+  USBH_HID_GamepadReset();
   Appli_state = APPLICATION_DISCONNECT;
   break;
 

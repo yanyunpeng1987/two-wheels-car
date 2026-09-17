@@ -770,6 +770,11 @@
               <FilePath>..\Hiwonder\src\KF.c</FilePath>
             </File>
             <File>
+              <FileName>gamepad_report.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hiwonder\src\gamepad_report.c</FilePath>
+            </File>
+            <File>
               <FileName>gamepad_handle.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hiwonder\src\gamepad_handle.c</FilePath>

@@ -1,95 +1,72 @@
-
 #include "usbh_hid_gamepad.h"
-#include "usbh_hid_parser.h"
 
+HID_GAMEPAD_Info_TypeDef gamepad_info;
+/* Word-aligned storage also covers the receiver's 64-byte endpoint capacity. */
+static uint32_t gamepad_rx_buffer[GAMEPAD_USB_RX_BYTES / sizeof(uint32_t)];
+static enum GamepadReportProfile gamepad_profile = GAMEPAD_REPORT_LEGACY;
+static uint8_t gamepad_report_valid;
 
+volatile uint16_t gamepad_raw_buttons;
+volatile uint32_t gamepad_reports_accepted;
+volatile uint32_t gamepad_reports_rejected;
 
-static USBH_StatusTypeDef USBH_HID_GamepadDecode(USBH_HandleTypeDef *phost);
+static void Gamepad_ClearInput(void)
+{
+    USBH_memset(&gamepad_info, 0, sizeof(gamepad_info));
+    gamepad_report_valid = 0U;
+    gamepad_raw_buttons = 0U;
+    info = NULL;
+}
 
+uint8_t USBH_HID_GamepadIs20BC(const USBH_HandleTypeDef *phost)
+{
+    return (phost != NULL) && (phost->device.DevDesc.idVendor == 0x20BCU) &&
+           (phost->device.DevDesc.idProduct == 0x5500U);
+}
 
-HID_GAMEPAD_Info_TypeDef    gamepad_info;
-uint8_t                  gamepad_report_data[32];
-uint8_t                  gamepad_rx_report_buf[32];
+void USBH_HID_GamepadReset(void)
+{
+    Gamepad_ClearInput();
+    gamepad_profile = GAMEPAD_REPORT_LEGACY;
+    gamepad_reports_accepted = 0U;
+    gamepad_reports_rejected = 0U;
+}
 
-
-
-/** @defgroup USBH_HID_GAMEPAD_Private_Functions
-  * @{
-  */
-
-/**
-  * @brief  USBH_HID_GamepadInit
-  *         The function init the HID gamepad.
-  * @param  phost: Host handle
-  * @retval USBH Status
-  */
 USBH_StatusTypeDef USBH_HID_GamepadInit(USBH_HandleTypeDef *phost)
 {
-    uint32_t i;
-    HID_HandleTypeDef *HID_Handle = (HID_HandleTypeDef *) phost->pActiveClass->pData;
-
-    gamepad_info.buttons = 0;
-	gamepad_info.lx = 0;
-	gamepad_info.ly = 0;
-	gamepad_info.rx = 0;
-	gamepad_info.ry = 0;
-
-    for (i = 0U; i < sizeof(gamepad_report_data); i++) {
-        gamepad_report_data[i] = 0U;
-        gamepad_rx_report_buf[i] = 0U;
+    HID_HandleTypeDef *hid = (HID_HandleTypeDef *)phost->pActiveClass->pData;
+    USBH_HID_GamepadReset();
+    if ((hid == NULL) || (hid->length == 0U) || (hid->length > GAMEPAD_USB_RX_BYTES)) {
+        return USBH_FAIL;
     }
-	
-    if (HID_Handle->length > sizeof(gamepad_report_data)) {
-        HID_Handle->length = (uint16_t)sizeof(gamepad_report_data);
-    }
-    HID_Handle->pData = (uint8_t *)(void *)gamepad_rx_report_buf;
-    USBH_HID_FifoInit(&HID_Handle->fifo, phost->device.Data, (uint16_t)(HID_QUEUE_SIZE * sizeof(gamepad_report_data)));
-
+    gamepad_profile = USBH_HID_GamepadIs20BC(phost) ?
+                      GAMEPAD_REPORT_20BC_5500 : GAMEPAD_REPORT_LEGACY;
+    USBH_memset(gamepad_rx_buffer, 0, sizeof(gamepad_rx_buffer));
+    hid->pData = (uint8_t *)(void *)gamepad_rx_buffer;
     return USBH_OK;
 }
 
-/**
-  * @brief  USBH_HID_GetGamepadInfo
-  *         The function return gamepad information.
-  * @param  phost: Host handle
-  * @retval gamepad information
-  */
-HID_GAMEPAD_Info_TypeDef *USBH_HID_GetGamepadInfo(USBH_HandleTypeDef *phost)
+void USBH_HID_GamepadReceive(USBH_HandleTypeDef *phost, uint32_t length)
 {
-    if (USBH_HID_GamepadDecode(phost) == USBH_OK) {
-        return &gamepad_info;
-    } else {
-        return NULL;
+    HID_HandleTypeDef *hid = (HID_HandleTypeDef *)phost->pActiveClass->pData;
+    if ((hid == NULL) || (hid->pData == NULL) || (length > hid->length) ||
+        (length > GAMEPAD_USB_RX_BYTES) ||
+        !Gamepad_DecodeReport(gamepad_profile, hid->pData, (uint16_t)length, &gamepad_info)) {
+        Gamepad_ClearInput();
+        gamepad_reports_rejected++;
+        return;
     }
+    gamepad_raw_buttons = (gamepad_profile == GAMEPAD_REPORT_20BC_5500) ?
+                          ((uint16_t)hid->pData[0] | ((uint16_t)hid->pData[1] << 8)) :
+                          gamepad_info.buttons;
+    gamepad_report_valid = 1U;
+    gamepad_reports_accepted++;
 }
 
-/**
-  * @brief  USBH_HID_GamepadDecode
-  *         The function decode gamepad data.
-  * @param  phost: Host handle
-  * @retval USBH Status
-  */
-static USBH_StatusTypeDef USBH_HID_GamepadDecode(USBH_HandleTypeDef *phost)
+HID_GAMEPAD_Info_TypeDef *USBH_HID_GetGamepadInfo(USBH_HandleTypeDef *phost)
 {
-    HID_HandleTypeDef *HID_Handle = (HID_HandleTypeDef *) phost->pActiveClass->pData;
-
-    if ((HID_Handle->length < 8U) || (HID_Handle->length > sizeof(gamepad_report_data))) {
-        return USBH_FAIL;
+    if ((phost == NULL) || (phost->gState != HOST_CLASS) || !gamepad_report_valid) {
+        return NULL;
     }
-    /*Fill report */
-    if (USBH_HID_FifoRead(&HID_Handle->fifo, &gamepad_report_data, HID_Handle->length) ==  HID_Handle->length) {
-		if ((HID_Handle->length > 20U) && (gamepad_report_data[20] == 0x02)) {
-			return USBH_FAIL;
-		}
-        /*Decode report */
-		gamepad_info.buttons = ((uint16_t)gamepad_report_data[6]) << 8 | ((uint16_t)gamepad_report_data[7]);
-		gamepad_info.hat = 0x0F & (~gamepad_report_data[5]);
-		gamepad_info.lx = ((int)gamepad_report_data[1]) - 128;
-		gamepad_info.ly = (127 -(int)gamepad_report_data[2]);
-		gamepad_info.rx = ((int)gamepad_report_data[3]) - 128;
-		gamepad_info.ry = (127 -(int)gamepad_report_data[4]);
-		//printf("buttons:%0.4X, hat:%0.1X, lx:%d, ly:%d, rx:%d, ry:%d\r\n", gamepad_info.buttons, gamepad_info.hat, gamepad_info.lx, gamepad_info.ly, gamepad_info.rx, gamepad_info.ry);
-        return USBH_OK;
-    }
-    return   USBH_FAIL;
+    return &gamepad_info;
 }

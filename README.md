@@ -68,9 +68,11 @@ python tools/verify_project.py --artifacts
 | `docs/DEVELOPMENT_LOG.md` | 开发过程、验证证据和用户反馈 |
 | `docs/KNOWN_ISSUES.md` | 延后排查事项与独立待核查隐患 |
 
-开发和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段版本见 [CHANGELOG.md](CHANGELOG.md)，第三方来源见 [授权文件索引](docs/THIRD_PARTY_NOTICES.md)。GitHub Actions 只做源码静态检查，Keil 完整编译在已安装工具链的 Windows 上执行。
+开发和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段版本见 [CHANGELOG.md](CHANGELOG.md)，第三方来源见 [授权文件索引](docs/THIRD_PARTY_NOTICES.md)。GitHub Actions 执行源码检查和手柄 C 回归测试，Keil 完整编译在已安装工具链的 Windows 上执行。
 
 USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
+
+`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。新增的纯 C 报文解析模块已加入 Keil 工程，当前编译输入为 74 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
 
 后续修改 `Firmware/`。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 

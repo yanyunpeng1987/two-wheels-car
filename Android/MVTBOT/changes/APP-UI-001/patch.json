@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "baselineFile": "baseline/project-files.json",
+  "targetVersionCode": 22,
+  "targetVersionName": "2.3.6-mvtbot.3",
+  "resourceEdits": [
+    {
+      "path": "res/layout/base_content.xml",
+      "beforeSha256": "99a770c391a733ba69f4703e48fd4283a1b383b212f2aa7445d96feef8e4ae36",
+      "afterSha256": "bb320722e266dafefd9d6a1b816a92ce3723acb4f5374802f2d34ac09baa4d72",
+      "replacements": [
+        {
+          "old": "android:id=\"@id/iv_menu\"",
+          "new": "android:id=\"@id/iv_menu\" android:visibility=\"gone\" android:enabled=\"false\" android:clickable=\"false\" android:focusable=\"false\""
+        },
+        {
+          "old": "android:layout_marginStart=\"20.0dp\" android:layout_toEndOf=\"@id/iv_menu\"",
+          "new": "android:layout_marginStart=\"@dimen/margin_left\" android:layout_alignParentStart=\"true\""
+        }
+      ]
+    },
+    {
+      "path": "res/layout/layout_contact.xml",
+      "beforeSha256": "78a0f8fd93bc046aa1a948a509a0368e1cef5977b1768868c387509643a8e75f",
+      "afterSha256": "db685eaf68fbf26407966528c2e0b2d6f99bc5727a4ba7cde9233db118813467",
+      "replacements": [
+        {
+          "old": "<RelativeLayout android:layout_width=\"match_parent\" android:layout_height=\"0.0dp\" android:layout_weight=\"4.0\">",
+          "new": "<RelativeLayout android:gravity=\"center\" android:layout_width=\"match_parent\" android:layout_height=\"0.0dp\" android:layout_weight=\"4.0\">"
+        },
+        {
+          "old": "android:id=\"@id/logo1_img\"",
+          "new": "android:id=\"@id/logo1_img\" android:visibility=\"gone\""
+        },
+        {
+          "old": "android:src=\"@drawable/logo_middle_min\"",
+          "new": "android:src=\"@null\""
+        },
+        {
+          "old": " android:layout_below=\"@id/logo1_img\"",
+          "new": ""
+        },
+        {
+          "old": "android:id=\"@id/email\"",
+          "new": "android:id=\"@id/email\" android:visibility=\"gone\""
+        },
+        {
+          "old": "android:layout_below=\"@id/email\"",
+          "new": "android:layout_below=\"@id/company\""
+        },
+        {
+          "old": "android:text=\"www.hiwonder.com\"",
+          "new": "android:text=\"@string/website_http\""
+        },
+        {
+          "old": "android:id=\"@id/scan_code\"",
+          "new": "android:id=\"@id/scan_code\" android:visibility=\"gone\""
+        }
+      ]
+    },
+    {
+      "path": "res/values/strings.xml",
+      "beforeSha256": "d079ae3979131f208cc3e2d1b8b2968c3fe50a89314339467240c641778fd382",
+      "afterSha256": "68455efb393ff7774d17a2a1d66146fe80200ada789858c78b43ab5771207956",
+      "replacements": [
+        {
+          "old": "<string name=\"company\">Manufacturer: Shenzhen Hiwonder Technology Co., Ltd.</string>",
+          "new": "<string name=\"company\">公司：杭州矩视科技有限公司</string>"
+        },
+        {
+          "old": "<string name=\"email\">E-mail: support@hiwonder.com</string>",
+          "new": "<string name=\"email\"></string>"
+        },
+        {
+          "old": "<string name=\"webchat_subscription\">webchat subscription</string>",
+          "new": "<string name=\"webchat_subscription\"></string>"
+        },
+        {
+          "old": "<string name=\"website_http\">www.hiwonder.com</string>",
+          "new": "<string name=\"website_http\">http://www.mvtlabs.com/</string>"
+        }
+      ]
+    },
+    {
+      "path": "res/values-zh-rCN/strings.xml",
+      "beforeSha256": "941e7ad02bab386cbc6931decb176b94d4a858c6a381105584f325ece48b7b72",
+      "afterSha256": "eb9e6f2740403d6ccf7301bddaa948e91cccf3be32ee6e018c1fb9d8ec20d970",
+      "replacements": [
+        {
+          "old": "<string name=\"company\">公司：深圳市幻尔科技有限公司</string>",
+          "new": "<string name=\"company\">公司：杭州矩视科技有限公司</string>"
+        },
+        {
+          "old": "<string name=\"email\">邮箱：support.cn@hiwonder.com</string>",
+          "new": "<string name=\"email\"></string>"
+        },
+        {
+          "old": "<string name=\"webchat_subscription\">公众号：幻尔机器人</string>",
+          "new": "<string name=\"webchat_subscription\"></string>"
+        },
+        {
+          "old": "<string name=\"website_http\">www.hiwonder.com.cn</string>",
+          "new": "<string name=\"website_http\">http://www.mvtlabs.com/</string>"
+        }
+      ]
+    },
+    {
+      "path": "res/values-zh-rTW/strings.xml",
+      "beforeSha256": "51093d72fea1969d20537f7a69620f7ddb8064c83d66532df9b869a8bda89332",
+      "afterSha256": "90da9027a27f64fca2673df1c25d11ce2acd73a58b6c393a128cd8cbc8154e69",
+      "replacements": [
+        {
+          "old": "<string name=\"company\">公司：深圳市幻爾科技有限公司</string>",
+          "new": "<string name=\"company\">公司：杭州矩视科技有限公司</string>"
+        },
+        {
+          "old": "<string name=\"email\">E-mail：support@hiwonder.com</string>",
+          "new": "<string name=\"email\"></string>"
+        },
+        {
+          "old": "<string name=\"webchat_subscription\">公眾號：幻尔机器人</string>",
+          "new": "<string name=\"webchat_subscription\"></string>"
+        },
+        {
+          "old": "<string name=\"website_http\">www.hiwonder.com</string>",
+          "new": "<string name=\"website_http\">http://www.mvtlabs.com/</string>"
+        }
+      ]
+    }
+  ],
+  "smaliEdits": [
+    {
+      "path": "smali/com/Wonder/bot/StartActivity.smali",
+      "beforeSha256": "79f70b9ee74c302a48df869cb50186301863aa029d8719a824c98aae27584c9c",
+      "afterSha256": "5612a843e6c7fe1d1e8dace6643d11299fc145085bf7bbc8d4a38bd61df451fe",
+      "replacements": [
+        {
+          "old": ".method protected onCreate(Landroid/os/Bundle;)V\r\n    .locals 3\r\n\r\n    .line 30\r\n    invoke-super {p0, p1}, Landroidx/appcompat/app/AppCompatActivity;->onCreate(Landroid/os/Bundle;)V\r\n\r\n    const/4 p1, 0x1\r\n\r\n    .line 31\r\n    invoke-virtual {p0, p1}, Lcom/Wonder/bot/StartActivity;->supportRequestWindowFeature(I)Z\r\n\r\n    .line 32\r\n    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getWindow()Landroid/view/Window;\r\n\r\n    move-result-object p1\r\n\r\n    const/16 v0, 0x400\r\n\r\n    invoke-virtual {p1, v0, v0}, Landroid/view/Window;->setFlags(II)V\r\n\r\n    .line 33\r\n    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getWindow()Landroid/view/Window;\r\n\r\n    move-result-object p1\r\n\r\n    invoke-static {p1}, Lcom/Wonder/bot/utils/CutoutUtils;->setCutoutBackgroundBlack(Landroid/view/Window;)V\r\n\r\n    .line 34\r\n    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getLayoutInflater()Landroid/view/LayoutInflater;\r\n\r\n    move-result-object p1\r\n\r\n    invoke-static {p1}, Lcom/Wonder/bot/databinding/ActivityStartBinding;->inflate(Landroid/view/LayoutInflater;)Lcom/Wonder/bot/databinding/ActivityStartBinding;\r\n\r\n    move-result-object p1\r\n\r\n    iput-object p1, p0, Lcom/Wonder/bot/StartActivity;->binding:Lcom/Wonder/bot/databinding/ActivityStartBinding;\r\n\r\n    .line 35\r\n    invoke-virtual {p1}, Lcom/Wonder/bot/databinding/ActivityStartBinding;->getRoot()Landroid/widget/RelativeLayout;\r\n\r\n    move-result-object p1\r\n\r\n    invoke-virtual {p0, p1}, Lcom/Wonder/bot/StartActivity;->setContentView(Landroid/view/View;)V\r\n\r\n    .line 38\r\n    invoke-static {p0}, Lcom/bumptech/glide/Glide;->with(Landroidx/fragment/app/FragmentActivity;)Lcom/bumptech/glide/RequestManager;\r\n\r\n    move-result-object p1\r\n\r\n    const v0, 0x7f0701f9\r\n\r\n    invoke-static {v0}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\r\n\r\n    move-result-object v0\r\n\r\n    invoke-virtual {p1, v0}, Lcom/bumptech/glide/RequestManager;->load(Ljava/lang/Integer;)Lcom/bumptech/glide/RequestBuilder;\r\n\r\n    move-result-object p1\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/StartActivity;->binding:Lcom/Wonder/bot/databinding/ActivityStartBinding;\r\n\r\n    iget-object v0, v0, Lcom/Wonder/bot/databinding/ActivityStartBinding;->image:Landroid/widget/ImageView;\r\n\r\n    invoke-virtual {p1, v0}, Lcom/bumptech/glide/RequestBuilder;->into(Landroid/widget/ImageView;)Lcom/bumptech/glide/request/target/ViewTarget;\r\n\r\n    .line 39\r\n    iget-object p1, p0, Lcom/Wonder/bot/StartActivity;->mainHandler:Landroid/os/Handler;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/StartActivity;->openMainActivity:Ljava/lang/Runnable;\r\n\r\n    const-wide/16 v1, 0xbb8\r\n\r\n    invoke-virtual {p1, v0, v1, v2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z\r\n\r\n    return-void\r\n.end method",
+          "new": ".method protected onCreate(Landroid/os/Bundle;)V\r\n    .locals 2\r\n\r\n    invoke-super {p0, p1}, Landroidx/appcompat/app/AppCompatActivity;->onCreate(Landroid/os/Bundle;)V\r\n\r\n    new-instance v0, Landroid/content/Intent;\r\n\r\n    const-class v1, Lcom/Wonder/bot/MainActivity;\r\n\r\n    invoke-direct {v0, p0, v1}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V\r\n\r\n    invoke-virtual {p0, v0}, Lcom/Wonder/bot/StartActivity;->startActivity(Landroid/content/Intent;)V\r\n\r\n    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->finish()V\r\n\r\n    return-void\r\n.end method"
+        }
+      ]
+    },
+    {
+      "path": "smali/com/Wonder/bot/MainActivity.smali",
+      "beforeSha256": "f691bb881a93bd267f9d1c5a5b747c656c95479a0299c64b96e0facdeb126255",
+      "afterSha256": "932148bdc216c7d3673e39356a9cad556d4bc5f4a3bc2358deeb6d6928b9c1e5",
+      "replacements": [
+        {
+          "old": ".method private enterView(I)V\r\n    .locals 1\r\n\r\n    const/4 v0, -0x1\r\n\r\n    if-ne p1, v0, :cond_0\r\n\r\n    .line 429\r\n    sget-object p1, Lcom/Wonder/bot/Device;->H5S:Lcom/Wonder/bot/Device;\r\n\r\n    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->selectDevice(Lcom/Wonder/bot/Device;)V\r\n\r\n    .line 430\r\n    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->openDrawer(Landroid/view/View;)V\r\n\r\n    goto :goto_0\r\n\r\n    .line 432\r\n    :cond_0\r\n    sget-object v0, Lcom/Wonder/bot/Device;->H5S:Lcom/Wonder/bot/Device;\r\n\r\n    invoke-static {p1, v0}, Lcom/Wonder/bot/Device;->fromIdOrDefault(ILcom/Wonder/bot/Device;)Lcom/Wonder/bot/Device;\r\n\r\n    move-result-object p1\r\n\r\n    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->selectDevice(Lcom/Wonder/bot/Device;)V\r\n\r\n    .line 433\r\n    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->isDrawerOpen(Landroid/view/View;)Z\r\n\r\n    move-result p1\r\n\r\n    if-eqz p1, :cond_1\r\n\r\n    .line 434\r\n    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->closeDrawer(Landroid/view/View;)V\r\n\r\n    :cond_1\r\n    :goto_0\r\n    return-void\r\n.end method",
+          "new": ".method private enterView(I)V\r\n    .locals 3\r\n\r\n    sget-object p1, Lcom/Wonder/bot/Device;->MINIBALAN:Lcom/Wonder/bot/Device;\r\n\r\n    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->selectDevice(Lcom/Wonder/bot/Device;)V\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v1, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    const/4 v2, 0x0\r\n\r\n    invoke-virtual {v0, v1, v2}, Landroidx/drawerlayout/widget/DrawerLayout;->closeDrawer(Landroid/view/View;Z)V\r\n\r\n    const/4 v2, 0x1\r\n\r\n    invoke-virtual {v0, v2}, Landroidx/drawerlayout/widget/DrawerLayout;->setDrawerLockMode(I)V\r\n\r\n    return-void\r\n.end method"
+        },
+        {
+          "old": ".method private selectDevice(Lcom/Wonder/bot/Device;)V\r\n    .locals 2\r\n\r\n    .line 1024\r\n    sget v0, Lcom/Wonder/bot/MainActivity;->CurrentEquipment:I\r\n\r\n    invoke-virtual {p1}, Lcom/Wonder/bot/Device;->id()I\r\n\r\n    move-result v1\r\n\r\n    if-eq v0, v1, :cond_0\r\n\r\n    iget-boolean v0, p0, Lcom/Wonder/bot/MainActivity;->showCameraFlag:Z\r\n\r\n    if-eqz v0, :cond_0\r\n\r\n    const/4 v0, 0x0\r\n\r\n    .line 1025\r\n    invoke-direct {p0, v0}, Lcom/Wonder/bot/MainActivity;->setCameraVideoShow(Z)V\r\n\r\n    .line 1027\r\n    :cond_0\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->fragmentNavigator:Lcom/Wonder/bot/navigation/FragmentNavigator;\r\n\r\n    invoke-virtual {v0, p1}, Lcom/Wonder/bot/navigation/FragmentNavigator;->show(Lcom/Wonder/bot/Device;)Landroidx/fragment/app/Fragment;\r\n\r\n    .line 1028\r\n    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->viewChanged(Lcom/Wonder/bot/Device;)V\r\n\r\n    return-void\r\n.end method",
+          "new": ".method private selectDevice(Lcom/Wonder/bot/Device;)V\r\n    .locals 2\r\n\r\n    sget-object p1, Lcom/Wonder/bot/Device;->MINIBALAN:Lcom/Wonder/bot/Device;\r\n\r\n    invoke-virtual {p1}, Lcom/Wonder/bot/Device;->id()I\r\n\r\n    move-result v0\r\n\r\n    sput v0, Lcom/Wonder/bot/MainActivity;->cardChoosed:I\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->deviceSelectionStore:Lcom/Wonder/bot/navigation/DeviceSelectionStore;\r\n\r\n    invoke-virtual {v0, p1}, Lcom/Wonder/bot/navigation/DeviceSelectionStore;->save(Lcom/Wonder/bot/Device;)V\r\n\r\n    .line 1024\r\n    sget v0, Lcom/Wonder/bot/MainActivity;->CurrentEquipment:I\r\n\r\n    invoke-virtual {p1}, Lcom/Wonder/bot/Device;->id()I\r\n\r\n    move-result v1\r\n\r\n    if-eq v0, v1, :cond_0\r\n\r\n    iget-boolean v0, p0, Lcom/Wonder/bot/MainActivity;->showCameraFlag:Z\r\n\r\n    if-eqz v0, :cond_0\r\n\r\n    const/4 v0, 0x0\r\n\r\n    .line 1025\r\n    invoke-direct {p0, v0}, Lcom/Wonder/bot/MainActivity;->setCameraVideoShow(Z)V\r\n\r\n    .line 1027\r\n    :cond_0\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->fragmentNavigator:Lcom/Wonder/bot/navigation/FragmentNavigator;\r\n\r\n    invoke-virtual {v0, p1}, Lcom/Wonder/bot/navigation/FragmentNavigator;->show(Lcom/Wonder/bot/Device;)Landroidx/fragment/app/Fragment;\r\n\r\n    .line 1028\r\n    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->viewChanged(Lcom/Wonder/bot/Device;)V\r\n\r\n    return-void\r\n.end method"
+        },
+        {
+          "old": ".method public onLeftMenuBtn(Landroid/view/View;)V\r\n    .locals 1\r\n\r\n    .line 1057\r\n    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->isDrawerOpen(Landroid/view/View;)Z\r\n\r\n    move-result p1\r\n\r\n    if-nez p1, :cond_0\r\n\r\n    .line 1058\r\n    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;\r\n\r\n    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;\r\n\r\n    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->openDrawer(Landroid/view/View;)V\r\n\r\n    :cond_0\r\n    return-void\r\n.end method",
+          "new": ".method public onLeftMenuBtn(Landroid/view/View;)V\r\n    .locals 0\r\n\r\n    return-void\r\n.end method"
+        }
+      ]
+    },
+    {
+      "path": "smali/com/Wonder/bot/dialog/ContactDialog.smali",
+      "beforeSha256": "f5a99b278dd69329b7f313774d3d76b48a21efa101e8023b4a1d9e6e6a96b01b",
+      "afterSha256": "a72c4388adad28821c357b1c0a8b74bb9003a5244fd56bf2a5ffc0c212d7ca7a",
+      "replacements": [
+        {
+          "old": "\"www.hiwonder.com.cn\"",
+          "new": "\"http://www.mvtlabs.com/\""
+        },
+        {
+          "old": "\"www.hiwonder.com\"",
+          "new": "\"http://www.mvtlabs.com/\""
+        },
+        {
+          "old": "\"https://\"",
+          "new": "\"\""
+        },
+        {
+          "old": "    invoke-virtual {p1, v0}, Landroid/widget/TextView;->setVisibility(I)V",
+          "new": "    const/16 v0, 0x8\r\n\r\n    invoke-virtual {p1, v0}, Landroid/widget/TextView;->setVisibility(I)V"
+        }
+      ]
+    }
+  ]
+}

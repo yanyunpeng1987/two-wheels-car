@@ -1,0 +1,13 @@
+# MVTBOT module
+
+- Read README.md and docs/HANDOFF.md before working on the app. Firmware collaboration entry points are in docs/PROTOCOL_COORDINATION.md.
+- project/ is the current v21 Apktool rebuild input (raw DEX + resources), not original Java/Kotlin source. materials/analysis/jadx-reference has 103 known decompilation errors; do not treat it as a buildable source project.
+- Version 21 is 2.3.6-mvtbot.2 with the custom MVTBOT icon. Its parser and DEX are unchanged from original Wonderbot 2.3.6. The NUL crash remains unresolved and was explicitly deferred pending device-side evidence.
+- Preserve raw crash evidence. C0 80 in the captured Android JNI logs represents one Java NUL in Modified UTF-8; it is not proof that the BLE wire contained C0 80.
+- Use tools/Build-MVTBOT.ps1 for local packaging. It does not install an APK. Device installation, BLE interaction and firmware flashing are separate actions that must follow the user's current scope and target selection.
+- The existing build preserves raw DEX and checks that packaging leaves its payload unchanged. It does not build app logic from Java/smali. Before a logic change, define versioned patch/native-source inputs and the corresponding DEX build and regression checks; do not claim that workflow already exists.
+- Signing keys and the DPAPI password remain in the user's LOCALAPPDATA/Android/Signing/MVTBOT directory. Never copy, print, archive or commit private signing material.
+- materials/, project/, build/ and validation/ stay local under the repository policy for original packages, device evidence and generated artifacts. Git maintains documentation, reusable scripts, owned branding, baseline/project-files.json and changes/README.md. Never add APKs, complete decompiled sources, local import metadata or signing secrets to Git.
+- Follow changes/README.md when beginning any resource or logic edits so changes in ignored project/ are captured as explicit patches/versioned inputs. The v21 baseline records hashes only; it is immutable history, not recoverable source or a replacement for the full archive.
+- New Git clones/worktrees omit those local directories. Run python tools/verify_android.py from the repository root for repository-only checks. Restore the full archive before APK work, then use --project-root Android/MVTBOT/project and the import verifier. Missing local artifacts do not mean an empty Android source project. Intentional changes fail import-baseline verification; preserve and version them instead of overwriting files to pass.
+- Preserve any other task's changes in Firmware/ and shared project documents. No app packaging task implies permission to change the motor-control firmware.

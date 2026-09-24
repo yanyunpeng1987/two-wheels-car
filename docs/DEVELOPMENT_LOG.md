@@ -145,3 +145,17 @@ GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，o
 - 实机证据：主板/固件标识、接线、复现步骤、实测结果；未测试则明确注明。
 - 未完成事项：不确定结论、已知问题编号、下一步验证。
 - 回退：可恢复的提交/标签，以及参数或数据兼容性要求。
+
+## 2026-09-24 — APK 与固件持续迭代管理基线
+
+新增跨端需求台账、协议索引、版本与联调矩阵、根 AGENTS、分支/提交规范和 GitHub 模板。MVTBOT 文档、构建脚本、自有图标及只含相对路径/大小/哈希的 v21 输入清单进入管理；派生项目、原包、APK、原始设备证据和签名材料按既有政策本地保管。后续 APP 业务改动必须有明确版本化补丁或正式源码模块；当前脚本仍仅支持保留原 DEX 的打包。
+
+本次 GitHub 核对：私有仓库、main=499b420、现有功能分支=82f3b45、PR #1 为草稿且既有 Actions 成功。使用基于82f3b45的独立 worktree/分支 codex/apk-firmware-management，不提交另一任务正在调试的电机极性/T1/T2代码、测试和CI变更。主工作区76输入与本分支74输入分别记录，没有把本地固件状态描述成已进入GitHub。
+
+只读复核 Android 导入17,711文件/332,529,270字节全部匹配；可提交project基线1,445文件/42,437,889字节匹配。默认Android管理检查、固件源码引用/Flash布局检查、VS Code同步检查通过。现有v21签名重建是前一任务的历史证据，本次没有重新打包、安装、连接手机或烧录。当前发布与验收边界见RELEASE_MATRIX.md。
+
+回退可revert本次管理提交；原始材料与设备固件未被重排或删除。GitHub源码并不包含恢复APK所需全部本地输入，备份须另外保留。
+
+管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。
+
+管理文件同步回日常主工作区时保留原分支与未提交内容；同步前后383个Firmware/tests文件哈希一致，原T2日志与停机测试CI步骤保留。主目录Android实际输入、76输入工程及VS Code同步检查通过。此次同步的文件版本已在管理分支，后续提交须按需求选路径或整合分支，不能整体暂存共享工作区。

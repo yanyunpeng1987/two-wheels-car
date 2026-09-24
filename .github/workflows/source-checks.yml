@@ -21,6 +21,8 @@ jobs:
           persist-credentials: false
       - name: Verify project references and memory layout
         run: python3 tools/verify_project.py
+      - name: Verify Android management files and baseline manifest
+        run: python3 tools/verify_android.py
       - name: Execute gamepad report and adapter regression tests
         run: |
           mkdir -p build/tests
@@ -39,9 +41,9 @@ jobs:
           import ast
           import json
           from pathlib import Path
-          for path in Path('tools').glob('*.py'):
+          for path in [*Path('tools').glob('*.py'), *Path('Android/MVTBOT/tools').glob('*.py')]:
               ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
-          paths = [*Path('.vscode').glob('*.json'), *Path('docs').rglob('*.json'), Path('BalanceCar.code-workspace')]
+          paths = [*Path('.vscode').glob('*.json'), *Path('docs').rglob('*.json'), *Path('Android/MVTBOT/baseline').glob('*.json'), Path('BalanceCar.code-workspace')]
           for path in paths:
               json.loads(path.read_text(encoding='utf-8-sig'))
           print('Python syntax and repository JSON checks passed.')

@@ -1,6 +1,8 @@
 # BalanceCar 两轮自平衡小车
 
-基于幻尔科技 MiniBalan 的 STM32F401RB 固件建立的独立二次开发工程。Keil 与 VS Code **共用同一个 `.uvprojx`、Arm Compiler 6.16、源码清单和链接脚本**。
+统一维护两轮自平衡小车的 **STM32F401RB 固件与 MVTBOT Android 控制应用**。设备端基于幻尔科技 MiniBalan；Keil 与 VS Code **共用同一个 `.uvprojx`、Arm Compiler 6.16、源码清单和链接脚本**。
+
+持续迭代从 [开发文档入口](docs/README.md) 开始：[需求台账](docs/REQUIREMENTS.md)、[通信协议](docs/PROTOCOL.md)、[版本与联调矩阵](docs/RELEASE_MATRIX.md)。Android 入口为 [Android/MVTBOT](Android/MVTBOT/README.md)，当前是 v21 Apktool 派生工程，尚无原始 Android Studio 源码；新克隆需另外恢复本地输入，不能只凭 GitHub 重建 APK。
 
 GitHub：[yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle)（私有）。初始源码基线标签：`v0.1.0`；这不改变固件内部版本号。
 
@@ -13,7 +15,7 @@ cd Two-wheels-Car
 
 `Two-wheels-Car` 是本地目录名，GitHub 仓库仍为 `two-wheel-balancing-vehicle`。目录改名不改变远程地址、分支、标签或 Pull Request；已保存的编辑器和 Codex 项目入口需重新选择新路径。
 
-仓库包含构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，新克隆也不需要它。
+仓库包含设备固件构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，设备端新克隆也不需要它。Android 原包、派生输入、APK、原始日志及签名材料按模块说明分别保管。
 
 ## 快速开始
 
@@ -65,6 +67,10 @@ python tools/verify_project.py --artifacts
 | `Firmware/USB_HOST/`、`Firmware/Middlewares/` | USB Host 与 HID |
 | `Firmware/MDK-ARM/` | 新 Keil 工程、启动文件、显式 scatter |
 | `tools/` | 构建、VS Code 配置同步和固件检查 |
+| `Android/MVTBOT/` | APP 文档、打包脚本、品牌素材、输入哈希清单；本地材料由模块忽略规则隔离 |
+| `docs/README.md` | 两端开发文档导航 |
+| `docs/REQUIREMENTS.md` | 统一需求、状态和验收条件 |
+| `docs/PROTOCOL.md`、`docs/RELEASE_MATRIX.md` | 两端协议与版本配对 |
 | `docs/BASELINE.md` | 迁移范围、存储布局、验证结果 |
 | `docs/reference-import.json` | 原始参考树及导入源码 SHA-256 |
 | `docs/DEVELOPMENT_LOG.md` | 开发过程、验证证据和用户反馈 |
@@ -74,9 +80,9 @@ python tools/verify_project.py --artifacts
 
 USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
 
-`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。新增的纯 C 报文解析模块已加入 Keil 工程，当前编译输入为 74 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
+`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。纯 C 报文解析、保护/停机诊断及电池监测模块均已加入 Keil 工程，当前编译输入为 77 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
 
-后续修改 `Firmware/`。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
+设备端后续修改 `Firmware/`；APP 从 `Android/MVTBOT/` 开始。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 
 本基线保留参考固件的完整功能和 73 个活动编译输入，不是空白 HAL 工程。新增功能前先验证原板基本功能。原始 `.ioc` 保存在 `MiniBalan/`；直接用 CubeMX 覆盖新工程可能丢失手工驱动、源码组和参数分区，需要单独比对生成结果。
 
@@ -98,3 +104,9 @@ USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [�
 构建调用遵循 [Keil µVision 命令行文档](https://www.keil.com/support/man/docs/uv4cl/uv4cl_commandline.htm)，代码提示配置依据 [VS Code C/C++ 配置文档](https://code.visualstudio.com/docs/cpp/customize-cpp-settings)。工程配置以本地 `.uvprojx` 和实际构建结果为准。
 
 导入文件保留原有版权声明，HAL、CMSIS、USB 中间件的授权文件随源码保留。当前参考资料没有覆盖整个项目的统一授权文件，因此没有给整包重新声明统一开源许可证。
+
+## Android APP 与设备端协同开发
+
+MVTBOT 的 APK、重建输入、原始拆分包、反编译参考、蓝牙闪退原始日志和 Android 环境记录已归入 [Android/MVTBOT](Android/MVTBOT/README.md)。项目级入口见 [APP 开发资料索引](docs/ANDROID_MVTBOT.md)。
+
+当前 APP 基线为 v21（2.3.6-mvtbot.2，MVTBOT 图标版）；蓝牙 NUL 解析闪退仍待结合设备端日志分析，未因资料合并而修复。设备端继续编辑 Firmware/；APP 的本地重建和签名脚本不执行手机安装或固件下载。原始包、派生工程与证据按现有仓库约定本地保存，文档和脚本可统一管理。

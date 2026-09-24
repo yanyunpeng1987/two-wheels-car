@@ -53,3 +53,70 @@ After confirming the physical labels, edit that table and its expected test mask
 together. New-profile hat bits are Up=1, Right=2, Down=4, Left=8, neutral=0;
 all low-nibble values 8..15 are neutral according to the descriptor's HasNull
 flag. Legacy hat bytes retain their original inversion behavior.
+
+## Pickup protection and stop evidence (stage 1)
+
+These tests compile the same portable C modules used by Keil. The integration
+runner extracts the current `pick_up`, `myabs`, `turn_off`, and `key_scan`
+functions from `control.c`; only hardware/event interfaces are replaced.
+
+```sh
+mkdir -p build/tests
+gcc -std=c99 -Wall -Wextra -Werror -pedantic -IFirmware/Hiwonder/inc \
+  Firmware/Hiwonder/src/pickup_accel_guard.c tests/pickup_accel_guard_test.c \
+  -o build/tests/pickup_accel_guard_test
+./build/tests/pickup_accel_guard_test
+gcc -std=c99 -Wall -Wextra -Werror -pedantic -IFirmware/Hiwonder/inc \
+  Firmware/Hiwonder/src/control_stop_trace.c tests/control_stop_trace_test.c \
+  -o build/tests/control_stop_trace_test
+./build/tests/control_stop_trace_test
+python3 tests/control_guard_integration_test.py --cc gcc --output-dir build/tests/integration
+```
+
+On this Windows host, the local test tool is Zig 0.15.2 from the
+[Zig PyPI distribution](https://pypi.org/project/ziglang/0.15.2/), isolated under
+`build/test-tools/`; it does not replace the Keil compiler or modify PATH.
+Use `build/test-tools/ziglang/zig.exe cc` in place of `gcc` for the two C commands.
+The integration runner accepts the path to `zig.exe` via `--cc`.
+
+Coverage includes isolated acceleration spikes, sustained events, exact timer
+boundaries, invalid samples, excessive sample gaps, DWT wrap, unchanged speed
+limits, angle gates, key toggles, first-cause retention and a 64-frame ring.
+These are software behavior tests, not proof of sensor timing, interrupt load,
+motor shutdown latency or successful vehicle balancing. See
+[the staged vehicle test procedure](../docs/STOP_DIAGNOSTIC_TEST.md).
+
+## Startup safety (T2)
+
+```sh
+python3 tests/startup_safety_test.py --cc gcc --output-dir build/tests/startup
+```
+
+The runner extracts `startup_flash_read_only` and `startup_enable_control` from
+the actual main.c, then compiles them with minimal register/HAL stubs. It checks
+Flash PG/LOCK success and failure states, PWM/encoder reset ordering, high/low
+DRDY startup, and source integration that prevents early EXTI2 and the unlinked
+ADC DMA start. `--cc` accepts compiler names on PATH or an absolute compiler path;
+Zig is detected automatically. Passing host tests does not prove Flash integrity
+on the running board; T2 additionally requires post-boot readback and PG/LOCK checks.
+
+## Battery filtering and acquisition (T4 / FW-VOLT-001)
+
+```sh
+mkdir -p build/tests
+gcc -std=c99 -Wall -Wextra -Werror -pedantic -IFirmware/Hiwonder/inc \
+  Firmware/Hiwonder/src/battery_monitor.c tests/battery_monitor_test.c \
+  -o build/tests/battery_monitor_test
+./build/tests/battery_monitor_test
+python3 tests/battery_adc_test.py --cc gcc --output-dir build/tests/battery-adc
+```
+
+The production monitor tests cover median warmup/spikes, voltage thresholds,
+continuous low/recovery confirmation, invalid/stale data, alarm spacing,
+DWT wrap and diagnostic history. The ADC runner extracts the actual
+`get_battery_volt()` and provides minimal HAL/DWT stubs to exercise conversion,
+failure cleanup, EOC completion priority, the 1 ms wait limit, and restoration
+of the CCD channel. Integration checks require battery acquisition outside the
+control interrupt. These tests do not simulate analog interference or prove
+physical battery voltage; T4 must be checked on the vehicle alongside T3's
+retained encoder filtering and control behavior.

@@ -133,6 +133,49 @@ GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，o
 
 新目录实际执行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -Action Rebuild`，日志 `Firmware/build/keil/rebuild-20260924-120923-c0a8af3a.log`，结果 **0 Error(s), 0 Warning(s)**。Code 84,748、RO 7,492、RW 104、ZI 28,048 字节；`python tools/verify_project.py --artifacts` 和 `python tools/sync_vscode.py --check` 通过。HEX 加载数据 92,348 字节、RAM 28,152 字节，PID 参数区无 HEX 数据。重新构建后的 HEX SHA-256 仍为 `8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`，与迁移前完全一致。本次没有烧录或操作目标硬件。
 
+## 2026-09-24 — 新采购电机的两组驱动极性适配
+
+用户反馈新采购电机在相同线序下与参考样机转向相反，分别交换电机的两根驱动线后可以正常工作。本次依据该反馈，在软件中固定反转两个电机的驱动输出；编码器相序和计数极性保持原样。
+
+### 修改范围
+
+- `Firmware/Core/Inc/main.h`：M2_F/M2_B 改为 PB7/PB6，M1_F/M1_B 改为 PB9/PB8，GPIO 端口仍为 GPIOB。
+- `Firmware/Hiwonder/src/control.c`：`set_pwm()` 内交换 TIM4 CCR1/CCR2 和 CCR3/CCR4。左轮正输入写 CCR2、负输入写 CCR1；右轮正输入写 CCR3、负输入写 CCR4，幅值保持原样。
+- 仅交换 GPIO 宏不会改变实际方向，因为初始化将四个引脚按位 OR 后统一配置为 AF2，实际输出由固定 TIM4 通道决定，因此同步修改寄存器赋值。
+- 保留函数接口、左右电机归属、编码器、PID、PWM 频率和停止逻辑。两份固件文件保持 UTF-8/CRLF，`main.c` 原有用户改动及其文件内容未变。
+
+### 本地验证
+
+实际执行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -Action Rebuild`，使用 Arm Compiler 6.16 / Keil.STM32F4xx_DFP 2.17.1，结果 **0 Error(s), 0 Warning(s)**。日志为 `Firmware/build/keil/rebuild-20260924-130055-4e16748c.log`；Code 84,760、RO 7,496、RW 104、ZI 28,048 字节。
+
+`python tools/verify_project.py --artifacts` 和 `python tools/sync_vscode.py --check` 均通过：74 个活动编译输入，HEX 加载数据 92,364 字节，RAM 28,152 字节，Flash/RAM 地址范围合规，PID Sector 1 无 HEX 数据。新 HEX SHA-256 为 `dfc2f1d54774eebe70131879682c9c5160c50c115b1a42d0530fef5a3023298f`。
+
+从修改前后源码提取 `set_pwm()`，仅将成员访问与函数声明适配为 C# 等价语法，在主机内存寄存器桩中验证 16,051 个输入样例：分别遍历每侧 -4000..4000，覆盖 7×7 个正负、零及边界混合输入，每例额外执行停止检查；另通过 5 次连续正负切换/停止转换。新输出逐项等于原输出的两组通道互换，幅值不变，停止时四个 CCR 为零。该检查是等价语法寄存器逻辑验证，不是原生 C 主机测试或实车验证；实际 C 编译由上述 Keil 完整重编译验证。临时报告位于忽略目录 `build/motor-polarity-verification/result.txt`。
+
+初次 `git diff --check` 将固件保留的 CRLF 误报为行尾空白；使用仅对该次命令生效的 `core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol` 后，本次改动的空白检查通过，未修改 Git 全局/仓库配置。另以字节比对确认 `control.c` 除上述通道互换及注释外没有变化，编码器与控制算法保持原样。
+
+### 使用与回退
+
+上述源码修改及本地验证阶段未烧录或操作目标硬件；随后经用户授权完成本地下载，记录见下一节。用户随后确认本项修改测试正常、通过，验收记录见下文。新固件配合未经人工交换的电机线序使用；若此前已交换驱动线，应恢复原线序，避免硬件与软件两次反转。TIM4 使用 PWM2，四个 CCR 为零表示保留原停止状态，不表示四个物理引脚均为低电平。
+
+如需回退，应成对恢复 `main.h` 中两组管脚宏和 `set_pwm()` 的 CCR1/CCR2、CCR3/CCR4 映射，再重新编译；不涉及参数区修改。
+
+## 2026-09-24 — 电机极性适配固件本地下载与回读验证
+
+用户明确要求直接本地下载后自行验证。STM32CubeProgrammer v2.7.0 经 ST-Link/SWD 识别设备 ID `0x423`、STM32F401xB/C、128 KiB Flash，目标电压 3.25 V。先以软件复位方式连接并暂停内核，完整读取 131,072 字节 Flash 作为下载前备份。
+
+下载使用前节已验证 HEX 的固定副本，SHA-256 保持 `dfc2f1d54774eebe70131879682c9c5160c50c115b1a42d0530fef5a3023298f`。显式擦除 Sector 0、2、3、4，使用 `--skipErase` 禁止下载阶段追加自动擦除；未擦除 Sector 1，未修改 Option Bytes。CLI 报告 `Download verified successfully`。
+
+随后完整读取 128 KiB Flash，在主机端再次逐字节比对：HEX 的全部 92,364 字节与板上内容一致；PID Sector 1 的全部 16,384 字节与下载前备份一致。最后执行软件复位并运行内核，CLI 确认 `Software reset is performed`、`Core is running`。
+
+备份、下载固定副本、回读、日志和 manifest 均保存在忽略目录 `build/motor-flash-20260924-131511/`。上述下载过程验证了固件内容与参数保留；用户随后完成本项修改的实车测试并确认通过，见下一节。
+
+## 2026-09-24 — 两个电机方向互换适配通过用户实测
+
+用户在下载上述固件后反馈：“此项修改测试正常，通过”。据此将本次两个电机驱动方向互换适配标记为**用户实测通过**，本项验证待办关闭。
+
+验收对应本次已下载的 HEX，SHA-256 为 `dfc2f1d54774eebe70131879682c9c5160c50c115b1a42d0530fef5a3023298f`。该结论依据用户反馈，范围为本项电机方向适配。本次仅补充验收记录，未再次修改固件或操作硬件。
+
 ## 后续记录模板
 
 复制以下条目并按日期追加；只填写实际完成和实际观察到的内容。
@@ -145,3 +188,113 @@ GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，o
 - 实机证据：主板/固件标识、接线、复现步骤、实测结果；未测试则明确注明。
 - 未完成事项：不确定结论、已知问题编号、下一步验证。
 - 回退：可恢复的提交/标签，以及参数或数据兼容性要求。
+
+## 2026-09-24 — 意外退出平衡：T1 加速度确认与停机取证
+
+用户反馈平地自稳和运动时均可能突然倒下，Flag_move 回到0，Mode保持，通常无短鸣；要求按怀疑点逐一修改测试。首轮只改变加速度拿起条件：保持1.7g门限，连续有效超限至少20ms；失败读、低样本、相邻间隔>10ms、停机和重新使能清确认。使用DWT无符号周期差，不使用现有HAL_GetTick。20ms为试验值，尚未实车确认。
+
+新增两个便携C模块pickup_accel_guard/control_stop_trace并加入实际Keil项目，当前76个活动输入。输出门控首次1→0时冻结64次以内的采样和ACC/SPD/KEY/ANG原因，自动放下重启不覆盖首因；正常明确KEY0→1开始新记录。独立审查发现同一轮pick_up、KEY重开、ANG停机的组合会因无条件reset漏记，已增加control_stop_pending==NONE条件并纳入实际函数提取测试。屏幕显示T1，停机后显示冻结的原因、倾角、Z、编码器读取间隔、轮速、电压。没有在控制ISR打印或写Flash。
+
+本轮不改变原速度门限/整数截断/200Hz换算、±80°门控、PID、IMU低通、PC13及按键时基、自动放下行为。与本轮基线逐函数比对确认set_pwm、balance、velocity、turn_off、get_velocity_form_encoder、put_down、gamepad_scan完全一致；此前用户已验收的电机极性保留。main.c原有用户空格未动。
+
+本地原生C验证采用仅解包在build/test-tools的Zig 0.15.2，未修改PATH或Keil工具链。直接编译生产C模块：加速度114项、停机记录199项；从当前control.c提取真实pick_up/myabs/turn_off/key_scan并链接生产模块的组合测试78项，总计391项，0失败。测试涵盖持续时间、尖峰、无效样本、间隔、DWT回绕、速度与角度边界、按键重启及首因冻结。测试不执行真实HAL/中断/电机。CI已添加对应检查，本次未提交推送，未宣称远程CI通过。
+
+最终实际Keil全量编译日志：Firmware/build/keil/rebuild-20260924-141441-f902313d.log，Arm Compiler6.16，0错误0警告；Code87248、RO7604、RW104、ZI31464字节。项目/HEX/MAP/编辑器同步检查通过，HEX94960字节，RAM31568/65536，PID Sector1无HEX数据。HEX SHA-256为d65ebf3c41b42d2bd6d7e3ed93ada5892d482359cfa8eace3436e2a69ee15a1f。
+
+固定T1产物见build/stop-test-stage1/release/；源码与产物哈希及测试结果见manifest.json。本轮之前的源码、HEX/AXF/MAP保存在build/stop-test-stage1/baseline/，回退HEX哈希dfc2f1d54774eebe70131879682c9c5160c50c115b1a42d0530fef5a3023298f。详细实车顺序与屏幕解释见STOP_DIAGNOSTIC_TEST.md。
+
+截至本条记录，未连接或下载目标设备，T1实车效果待验证。T2速度周期与T3按键输入配置须按第一轮现场结果继续逐项推进，不认定根因已修复。
+
+## 2026-09-24 — T1 最终缓冲调整、下载恢复与逐字节验收
+
+用户确认设备已准备好并要求继续下载。下载前核查到原启动文件栈只有0x400（1KiB）；将本轮新增的中断采样临时结构和主循环显示快照改为静态RAM，减少新增栈占用。未顺带修改原栈配置；原有主循环/中断嵌套的总栈余量仍需单独验证，不将此次局部调整称为整体栈安全证明。
+
+最后Keil全量构建日志为Firmware/build/keil/rebuild-20260924-141858-fd58bee3.log，0错误0警告；Code87188、RO7600、RW104、ZI31568。最终HEX94896字节，RAM31672/65536，PID Sector1无HEX数据；固定HEX SHA-256为6f9f22d6511258292c4abf56c3c9fc88e22a820765b1c2ea7afc860e56924900，取代上一节下载前初版。78项真实控制函数提取测试对最终control.c再次执行通过；此前114+199项生产模块检查保持通过，总计391项。测试runner已补充通过PATH解析编译器名，并以--cc zig实际复测，支持CI中的--cc gcc。
+
+CubeProgrammer2.7.0识别同一ST-Link目标为0x423、STM32F401xB/C、128KiB、3.25V。先暂停并新备份完整128KiBFlash和16KiB PID。首次HOTPLUG组合擦除/下载中，CLI报告扇区擦除失败，却继续写入并在0x08000001报校验不匹配；未把这次输出当成功。保存失败读回和日志，确认PID保持一致。
+
+随后显式软件复位/暂停，以NORMAL连接独立执行Sector0、2、3、4擦除；确认成功后才使用--skipErase写入固定T1HEX并校验，CLI报告Download verified successfully。再完整读取128KiBFlash，主机逐字节确认全部94896固件字节匹配，PID全部16384字节与本轮下载前备份一致。失败与恢复的直接原因尚未作寄存器级定位，不把HOTPLUG或DMA因素认定为根因。
+
+最后执行软件复位与Core run。此版CLI仅打印Core run而非Core is running，原脚本字符串断言因此失败；没有据此反复复位，而是通过HOTPLUG只读DHCSR验证0x01010000，S_HALT和S_LOCKUP均为0，确认内核已运行。该调试状态不等于平衡功能验收。下载工具在build中的初版脚本保留为历史证据，失败后不再用其组合program动作；最终阶段和结果以device/state.json为准。
+
+最终固件、基线备份、完整设备读回、失败及恢复日志与manifest均在build/stop-test-stage1/。T1已下载运行，等待用户先静止自稳、后运动的实测反馈及必要的Stop/Z/dt/轮速记录；尚未进入T2速度修正或T3按键配置改动，也未声称突然停机问题已修复。
+
+## 2026-09-24 — MVTBOT Android 资料并入统一项目
+
+按用户要求，将“提取 Wonderbot APK”任务的 Android 开发资料汇总到 Android/MVTBOT，使用已改名的 Two-wheels-Car 实际目录；Codex 保存的项目入口仍指向旧目录，未通过修改应用内部存储处理该入口。
+
+保留原始 4 个拆分包与备份 ZIP、v20/v21 APK及安装证据、当前 v21 Apktool 工程、v20 重建历史、9156 个 smali 与 4113 个 Java 参考文件、三次闪退原始 .raw 和统计、环境记录、合并工具及历史脚本。逐文件来源/大小/SHA-256 见 Android/MVTBOT/materials/import-manifest.json。大型安装器、可重建缓存和已验证重复 split-input 按清单去重，原任务目录未删除。
+
+当前 APP 仍为 versionCode21、2.3.6-mvtbot.2，既有图标版 DEX/业务逻辑未改变。新建相对路径构建脚本，只做本地重建、对齐、既有开发证书签名和载荷校验，不自动安装。私钥和 DPAPI 密文继续保留在当前 Windows 用户目录，没有复制进项目。归档/派生工程/产物由模块 .gitignore 排除，便于遵守现有源码提交约定。
+
+新增项目入口、交接、APP-001 状态和设备端/APP 对照位置，保留 JADX 103 项反编译错误及“非完整源码工程”的边界。完整本地验证结果见 Android/MVTBOT/docs/CONSOLIDATION.md。本次不修改 Firmware，不触碰其他任务的未提交代码，不提交或推送 Git，也不执行手机更新或设备下载。
+
+## 2026-09-24 — SWD停机现场与T2启动修复
+
+用户连接SWD再次复现后，只读捕获64帧和Flash，未暂停/复位。右路0→89计数触发SPD（240.17cm/s），dt4.505ms，angle−2.671°，az0.99988g；此前PWM−86..316，周期4.501857–4.508381ms，没有超长周期或大输出先行证据。现场数据在build/stop-test-stage2/capture-20260924-143711/。
+
+同时发现Flash四个中断向量与发布T1不同；独立复读物理和0地址别名一致，PG=1/LOCK=1、PGPERR=1。已精确追到ADC无DMA句柄却Start_DMA的三个NULL回调写，与受损向量字的AND结果全部吻合；0x18变零高度符合过早IMU中断下NULL GPIO BSRR写入。详见STARTUP_FLASH_CORRUPTION.md，未把它直接认定为编码器尖峰根因。
+
+因此T2优先修启动完整性：清PG再锁定并检查结果、删除无人使用的ADC DMA启动、GPIO阶段禁用EXTI2、检查QMI初始化、全部资源/PID完成后清编码器及pending并补偿DRDY高电平再使能控制。屏幕标记T2，运行时control.c与T1逐字节相同，PID/SPD/编码器/按键/电机映射保持。已有Android/MVTBOT并行改动未触碰。
+
+新增25项集成检查、246项真实C启动函数测试通过。Keil完整编译日志rebuild-20260924-144657-af4714b8.log：0错误0警告，Code86850/RO7606/RW104/ZI31568。项目/编辑器/HEX检查通过：94560个HEX字节，RAM31672，PID Sector1无数据。固定T2 HEX哈希4f2c44df38a244f14891f12579c461861c1e2d007c3c266803f09163fa3b5ae3。源码、产物、T1基线与manifest见build/stop-test-stage2/。截至本条，T2尚未下载；需固定设备后下载，且在启动后再次核对完整Flash及PG状态，再继续SPD实测。
+
+## 2026-09-24 — APK 与固件持续迭代管理基线
+
+新增跨端需求台账、协议索引、版本与联调矩阵、根 AGENTS、分支/提交规范和 GitHub 模板。MVTBOT 文档、构建脚本、自有图标及只含相对路径/大小/哈希的 v21 输入清单进入管理；派生项目、原包、APK、原始设备证据和签名材料按既有政策本地保管。后续 APP 业务改动必须有明确版本化补丁或正式源码模块；当前脚本仍仅支持保留原 DEX 的打包。
+
+本次 GitHub 核对：私有仓库、main=499b420、现有功能分支=82f3b45、PR #1 为草稿且既有 Actions 成功。使用基于82f3b45的独立 worktree/分支 codex/apk-firmware-management，不提交另一任务正在调试的电机极性/T1/T2代码、测试和CI变更。主工作区76输入与本分支74输入分别记录，没有把本地固件状态描述成已进入GitHub。
+
+只读复核 Android 导入17,711文件/332,529,270字节全部匹配；可提交project基线1,445文件/42,437,889字节匹配。默认Android管理检查、固件源码引用/Flash布局检查、VS Code同步检查通过。现有v21签名重建是前一任务的历史证据，本次没有重新打包、安装、连接手机或烧录。当前发布与验收边界见RELEASE_MATRIX.md。
+
+回退可revert本次管理提交；原始材料与设备固件未被重排或删除。GitHub源码并不包含恢复APK所需全部本地输入，备份须另外保留。
+
+管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。
+
+管理文件同步回日常主工作区时保留原分支与未提交内容；同步前后383个Firmware/tests文件哈希一致，原T2日志与停机测试CI步骤保留。主目录Android实际输入、76输入工程及VS Code同步检查通过。此次同步的文件版本已在管理分支，后续提交须按需求选路径或整合分支，不能整体暂存共享工作区。
+
+## 2026-09-24 — FW-START-001：T2下载与运行后完整性验证
+
+用户明确要求下载T2。对当前目标先新备份128KiB Flash与PID，分步软件复位/暂停、仅擦Sector0/2/3/4、--skipErase写入固定HEX和校验，再完整回读。94560固件字节全部匹配，PID16384字节逐字节不变。复位运行后两次HOTPLUG回读的完整Flash均等于写入后内容，四个向量均正确；FLASH_SR=0、FLASH_CR=0x80000000(PG0/LOCK1)、DHCSR=0x01010000。原始证据build/stop-test-stage2/device/，manifest已记录下载状态。
+
+第二次RAM记录已冻结，并非持续采样快照：SPD仍发生，右计数从+1跳到129，左0，右计算速度348.11cm/s，dt4.503ms，angle−2.509°，Z1.000244g，前一帧两侧PWM−86。用户明确反馈平地原地自稳下很快复现两次，当前倒地未再操作。T2证明启动Flash损坏在本次运行检查中消除，但FW-STOP-001没有解决。
+
+## 2026-09-24 — FW-STOP-001：T3仅加强右编码器数字滤波
+
+继续只读抓取最新记录和TIM2/TIM3/GPIOA。当前冻结现场与T2 repeat相同，不把同一份记录重复算成两次独立波形；用户报告两次复现是另行观察证据。TIM2/TIM3均SMCR=3、PSC0、ARRFFFF、CCMR1=A1A1；GPIOA的PA1/PA5为AF1输入上拉，映射符合实际右轮。T2全部HEX数据仍匹配，SR0/PG0。证据build/stop-test-stage3/capture-20260924-150416/。
+
+未发现其它代码写TIM2计数或复用右编码器引脚；ST ES0222未列出此种编码器CNT读取/清零大跳变限制。这不排除硬件问题或未列出机制。只延后SPD会把异常原始计数先送入速度PID，因此本轮选择输入端数字滤波实验，不增加软件停机延时。
+
+T3仅在MX_TIM2_Init将右轮IC1Filter/IC2Filter从10改15，TIM3保持10；屏幕改T3。84MHz/CKD1下滤波确认时间估计从约0.76–0.95us增至2.67–3.05us，可滤部分短毛刺，不承诺过滤超过3us的干扰。control.c、encoder.c与T2逐字节相同；SPD门限、PID、轮速公式、读后清零及电机输出不变。T2到T3 HEX加载内容仅2个字节不同：0x08000C22常量0A→0F（编译器复用两路滤波值），0x0801693E显示字符2→3。
+
+Keil完整编译rebuild-20260924-150635-a60aae46.log：0错误0警告；Code86850/RO7606/RW104/ZI31568，94560个HEX数据字节、RAM31672，PID区无HEX数据。源码范围、76输入、编辑器、地址与HEX检查通过。固件SHA-256为018c43adabf2ee42e532ee31856769ad2667908c416bf779d8cb5656401f71ad。单纯配置变更以编译、二进制差异和实机寄存器读回验证，没有编造新的行为测试数。
+
+沿用户逐项修改测试的授权推进；用户明确现场倒地未做其他操作，下载前只读确认实时flag_move=0。新备份后分步下载T3、完整回读、复位运行；94560字节匹配、PID16384字节保持。启动后Flash再次完整、PG0/LOCK1、IMU采样有效；实际TIM2 CCMR1=F1F1，TIM3=A1A1，证明确实只加强右路滤波。日志、读回及T2回退基线保存在build/stop-test-stage3/。T3已在机，等待同条件平地自稳实测；尚不能宣布编码器故障或整车问题已修复。
+
+## 2026-09-24 — FW-STOP-001：T3自稳约5分钟未复现（用户实测）
+
+用户反馈：“以前的版本，30秒之内都会复现问题。刚才的T3版本，目前自稳状态下测试了大约5分钟都是正常的。”对应已下载T3 HEX：018c43adabf2ee42e532ee31856769ad2667908c416bf779d8cb5656401f71ad。
+
+记录为T3静止自稳首轮测试通过、相对旧版明显改善；本轮时长由用户估计，并非工具连续计时。T3只加强右TIM2输入滤波，PID/SPD门限未变，结合前序右计数大跳变证据，结果进一步支持右编码器输入瞬态毛刺/干扰方向。但尚不能区分编码器本体、线束、接插件、供电/地回路等来源，也不能把单次5分钟正常当作长期可靠性或完整修复证明。
+
+FW-STOP-001转为待验证，KI-004保持未关闭。保持当前T3，后续继续较长时间自稳（建议累计至少30分钟），再验证前进/后退/左右转弯和受控拿起停机，观察误停、漏计或响应变化。若再现，保留供电与SWD现场再读取。本次仅更新用户验收记录、需求/版本/问题状态与本地manifest，没有改动固件、重新构建、连接或复位设备。
+
+## 2026-09-24 — FW-VOLT-001：T4电压滤波与低压提示
+
+用户再次确认T3持续自稳正常，要求优化电压滤波后一起测试。此前蜂鸣诊断只读快照位于build/buzzer-diagnostic/20260924-152559：当前11.83V、flag1、Normal；last beep1000Hz/50ms/2次、alarm_timer非零。说明低压分支曾触发，尚未区分测量毛刺、真实短暂下跌与同音型按键事件。
+
+以T3为基线新增battery_monitor纯C模块，77个实际Keil输入。电池采样移至main，与CCD串行；启动前预采一笔原始电压。每约100ms单次ADC，EOC用DWT周期差有界等待1ms，已完成转换优先于超时；所有HAL错误返回无效并停止/恢复CH10。控制IRQ不再访问ADC1。中值3点预热后低于9V连续1s确认、>=9.5V连续1s恢复，异常/gap>350ms/过期>500ms中断待确认但保留已确认低压状态，避免陈旧值产生新蜂鸣。沿用<=5V排除区间并记range_error，不当作正常恢复。新低压周期清alarm_sent，避免超过一轮DWT回绕后被旧alarm时间延迟。
+
+LCD显示滤波电压和LOW，未就绪显示--；SPD/蓝牙/停机快照继续使用最新成功原始voltage（改volatile单字发布）。control.c中balance/velocity/turn/set_pwm/pick_up/put_down/编码器换算/按键/get_angle/滚轮切模式等函数逐函数与T3相同，TIM2/3滤波及GPIO启动门控逐字节相同；本轮没有修改PID、SPD门限、通信帧或编码器计数逻辑。保留16笔诊断样本、raw低值/错误计数及报警快照，详情VOLTAGE_FILTER_TEST.md。
+
+生产滤波模块1125项C检查、实际ADC函数提取1304项C检查+6项集成检查通过；现有控制78项C、启动246项C+25项集成回归也通过（共2753项C、31项集成，0失败）。最终Keil全量日志rebuild-20260924-155403-bee4856b.log：0错误0警告，Code87140/RO7548/RW104/ZI31920，HEX94792字节，RAM32024/65536，PID区无数据。HEX SHA-256为3986cf56d190009946df4338f6b5cdd13ce72849bf95478a187142cd695d1271。
+
+T3基线备份、固定T4产物、源哈希和结果见build/voltage-filter-stage4/。截至本条T4尚未下载，仍需停止自稳并固定车辆后安排下载、运行后完整性/参数/采样状态核验和实车回归。T3用户稳定自稳结果保留，不将本地滤波测试当成电源噪声根因或整车验收证明。
+
+## 2026-09-24 — FW-VOLT-001：T4下载与运行后电压采样验证
+
+用户明确“已停稳并固定，继续下载T4”。先通过指定ST-Link新备份当前128KiB Flash与PID，再独立执行软件复位/暂停、Sector0/2/3/4擦除、--skipErase下载与校验、完整回读。全部94792固件字节匹配；PID16384字节与本次下载前备份相同。复位运行后完整Flash再次与写入后逐字节相同，PG0/LOCK1/SR0，右TIM2 CCMR1=F1F1、左TIM3=A1A1，T3输入滤波保持。
+
+读取新的battery_monitor实机结构（0x20000604、364B）并由独立代理离线核对布局：100笔采样，raw/median均1178cV，ready1/stale0/low_active0；ADC错误、范围错误、低原始值和报警计数均0，启动以来有效raw范围1116–1183cV。最近16笔采样均有效且就绪，实际间隔131.927–133.269ms；100ms是主循环最小调度周期，实际随主循环耗时延后，仍明显小于350ms间断门限。未以“没有声音”代替采样健康检查。
+
+同次控制快照未冻结，IMU有效、flag_move=1；这仅是捕获时状态，不代替长期自稳验收。记录和原始读回位于build/voltage-filter-stage4/device/，manifest已更新。T4已在机，等待用户继续验证自稳稳定性与偶发双短鸣是否改善；本次未做真实持续低电压供电实验或CCD实车回归。

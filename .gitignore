@@ -22,3 +22,14 @@ tools/*.local.*
 
 # Temporary verification checkouts
 /build/
+
+# Android outputs, local SDK settings and private signing material
+*.apk
+*.aab
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.dpapi
+**/.gradle/
+**/local.properties

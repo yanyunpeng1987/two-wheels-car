@@ -765,6 +765,21 @@
               <FilePath>..\Hiwonder\src\control.c</FilePath>
             </File>
             <File>
+              <FileName>pickup_accel_guard.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hiwonder\src\pickup_accel_guard.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_stop_trace.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hiwonder\src\control_stop_trace.c</FilePath>
+            </File>
+            <File>
+              <FileName>battery_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hiwonder\src\battery_monitor.c</FilePath>
+            </File>
+            <File>
               <FileName>KF.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hiwonder\src\KF.c</FilePath>

@@ -1,0 +1,16 @@
+# Local APK-derived inputs, releases, logs and generated outputs.
+# These remain inside the project for local coordinated development.
+/project/
+/materials/
+/build/
+/validation/
+*.local.*
+__pycache__/
+*.pyc
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.dpapi
+.env
+.env.*

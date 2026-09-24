@@ -15,6 +15,8 @@
 #include "lidar.h"
 #include "wondermind.h" 
 #include "persistent_storage.h"
+#include "pickup_accel_guard.h"
+#include "control_stop_trace.h"
 
 
 MV_RESULT_ST mv_result; 
@@ -53,16 +55,8 @@ static uint32_t recog_reset_time = 0;
 
 #define CONTROL_PERIOD_MS   4       // 定义您的 EXTI 中断周期，单位毫秒
 #define CONTROL_PERIOD_S    0.004f  // 对应的秒，用于计算 (4 / 1000.0f)
-// --- 低电压报警相关定义 ---
-#define LOW_VOLTAGE_THRESHOLD 9.0f  // 低电压阈值 (9.0V)
-#define BEEP_OFF_DURATION     1000  // 蜂鸣器每次响起的间隔时间 (ms)
-
-// 报警状态机
-typedef enum {
-    ALARM_STATE_IDLE,       // 状态：空闲/电压正常
-    ALARM_STATE_BEEPING,    // 状态：正在鸣响
-    ALARM_STATE_SILENT      // 状态：鸣响后的静默期
-} AlarmState_t;
+/* Battery filtering and alarm state are owned by the main loop. */
+BatteryMonitor battery_monitor;
 
 typedef enum {
     CROSSROAD_STATE_NONE,         // 状态：不在路口，正常循线
@@ -72,11 +66,32 @@ typedef enum {
 
 static CrossroadState_t crossroad_state = CROSSROAD_STATE_NONE; // 当前路口状态
 
-static AlarmState_t alarm_state = ALARM_STATE_IDLE;
-static uint32_t alarm_timer = 0; // 用于警报状态切换的计时器
 
 float gamepad_speed = 0.0f;  // 用于存储手柄的线性速度指令
 float gamepad_turn = 0.0f;   // 用于存储手柄的线性转向指令
+
+/* Stage 1: retain the speed/angle gates, confirm only the acceleration event. */
+#define PICKUP_ACCEL_CONFIRM_MS 20U
+#define PICKUP_ACCEL_MAX_GAP_MS 10U
+static PickupAccelGuard pickup_accel_guard;
+static uint8_t control_imu_valid;
+static uint8_t control_stop_pending;
+static uint32_t control_imu_cycles;
+volatile ControlStopTrace control_stop_trace;
+
+/* Copy only the frozen event while masked; formatting stays in the main loop. */
+uint8_t control_stop_snapshot(ControlStopSample *sample)
+{
+    uint32_t primask = __get_PRIMASK();
+    uint8_t frozen;
+    __disable_irq();
+    frozen = control_stop_trace.frozen;
+    if (frozen != 0U) {
+        *sample = control_stop_trace.trigger;
+    }
+    __set_PRIMASK(primask);
+    return frozen;
+}
 
 /**************************************************************************
 Function: Control function
@@ -99,7 +114,6 @@ Output  : none
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     //电压测量相关变量
 
-    static uint8_t flag_target; // 提供8ms基准, 4ms * 2
     int encoder_left;  // 左轮编码器脉冲计数
     int encoder_right; // 右轮编码器脉冲计数
     int balance_pwm;   // 平衡环PWM变量
@@ -107,12 +121,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 		static uint16_t braking_timer_ms = 0; // 用于刹车的专用计时器
 
     if(GPIO_Pin == IMU_INT2_Pin) {
-			  static uint32_t last_volt_read_time = 0;
+        static uint32_t last_encoder_cycles;
+        static uint8_t encoder_time_valid;
+        uint32_t encoder_cycles;
+        uint32_t encoder_interval_cycles;
+        uint8_t output_allowed;
+        static ControlStopSample stop_sample;
+        control_stop_pending = CONTROL_STOP_NONE;
 				MX_USB_HOST_Process();
 			
 				LidarApps_Process();
 
-        flag_target=!flag_target;
 
         get_angle(way_angle);               //更新姿态，5ms一次，更高的采样频率可以改善卡尔曼滤波和互补滤波的效果
 			
@@ -122,6 +141,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			
         encoder_left = -read_encoder(3);    //读取左轮编码器的值，前进为正，后退为负， TIM3M2, CC1CC2
         encoder_right = -read_encoder(2);   //读取右轮编码器的值，前进为正，后退为负   TIM3M1, CC3CC4
+        encoder_cycles = DWT->CYCCNT;
+        encoder_interval_cycles = encoder_time_valid ?
+            (uint32_t)(encoder_cycles - last_encoder_cycles) : 0U;
+        last_encoder_cycles = encoder_cycles;
+        encoder_time_valid = 1U;
 				//左轮A相接TIM2_CH1, 右轮A相接TIM4_CH2,故这里两个编码器的极性相同
         get_velocity_form_encoder(encoder_left,encoder_right); //编码器读数转速度（cm/s）
         if(1 == delay_flag) {
@@ -133,22 +157,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
             }
         }
 
-        if(1 == flag_target) {               //8ms控制一次
-					if(running_mode != CCD_Line_Patrol_Mode ) { 
-						if (HAL_GetTick() - last_volt_read_time > 100) {
-							voltage = get_battery_volt() / 100.0f; 
-							last_volt_read_time = HAL_GetTick();  // 启动500ms的事件抑制期
-					}
-					}
-				}
 					if (flag_move == 1) { // 只有在电机允许运行时，才检测“拿起”
 						if (pick_up()) {
 								flag_move = 0; // 检测到拿起，立即禁止电机运行
 								event_inhibit_timer = HAL_GetTick() + 300;  // 启动300ms的事件抑制期
 						}
 				} else { // 如果电机是禁止的，就检测“放下”
+                    pickup_accel_guard_reset(&pickup_accel_guard);
 						if (put_down()) {
 								flag_move = 1; // 检测到放下，允许电机运行
+                            pickup_accel_guard_reset(&pickup_accel_guard);
 								event_inhibit_timer = HAL_GetTick() + 300;
 						}
 				}
@@ -211,11 +229,34 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				motor_right=pwm_limit(motor_right, 4000, -4000);
 
 				//如果不存在异常
-				if(turn_off(angle_balance) == 0 ) {
+                output_allowed = (turn_off(angle_balance) == 0);
+                if ((angle_balance < -80.0f) || (angle_balance > 80.0f)) {
+                    control_stop_pending |= CONTROL_STOP_ANG;
+                }
+                if(output_allowed) {
 						set_pwm(motor_left,motor_right);         					//赋值给PWM寄存器
 				} else {
 					set_pwm(0, 0);
+                    pickup_accel_guard_reset(&pickup_accel_guard);
 			}
+
+        stop_sample.cycles = DWT->CYCCNT;
+        stop_sample.interval_cycles = encoder_interval_cycles;
+        stop_sample.accel_z = acceleration_z;
+        stop_sample.angle = angle_balance;
+        stop_sample.velocity_left = velocity_left;
+        stop_sample.velocity_right = velocity_right;
+        stop_sample.voltage = voltage;
+        stop_sample.encoder_left = encoder_left;
+        stop_sample.encoder_right = encoder_right;
+        stop_sample.pwm_left = output_allowed ? motor_left : 0;
+        stop_sample.pwm_right = output_allowed ? motor_right : 0;
+        stop_sample.imu_valid = control_imu_valid;
+        stop_sample.key_pressed = (READ_KEY() == 0);
+        stop_sample.flag_move = flag_move;
+        stop_sample.output_allowed = output_allowed;
+        stop_sample.reason_mask = control_stop_pending;
+        control_stop_trace_update(&control_stop_trace, &stop_sample);
     }
 	}
 
@@ -476,25 +517,26 @@ int turn(float gyro) {
  * @param motor_right 右轮PWM
  */
 void set_pwm(int motor_left,int motor_right) {
+    /* Swap CH1/CH2 and CH3/CH4 to match the replacement motor polarity. */
     if(motor_left > 0) {
-        TIM4->CCR1 = motor_left;
-        TIM4->CCR2 = 0;
+        TIM4->CCR2 = motor_left;
+        TIM4->CCR1 = 0;
     } else if(motor_left < 0) {
-        TIM4->CCR1 = 0;
-        TIM4->CCR2 = -motor_left;
-    } else {
-        TIM4->CCR1 = 0;
         TIM4->CCR2 = 0;
+        TIM4->CCR1 = -motor_left;
+    } else {
+        TIM4->CCR2 = 0;
+        TIM4->CCR1 = 0;
     }
     if(motor_right > 0) {
-        TIM4->CCR4 = motor_right;
-        TIM4->CCR3 = 0;
+        TIM4->CCR3 = motor_right;
+        TIM4->CCR4 = 0;
     } else if(motor_right < 0) {
-        TIM4->CCR4 = 0;
-        TIM4->CCR3 = -motor_right;
-    } else {
-        TIM4->CCR4 = 0;
         TIM4->CCR3 = 0;
+        TIM4->CCR4 = -motor_right;
+    } else {
+        TIM4->CCR3 = 0;
+        TIM4->CCR4 = 0;
     }
 }
 
@@ -542,7 +584,17 @@ void key_scan(void) {
             break;
 
         case KEY_EVENT_LONG_PRESS: // 长按
-            flag_move = !flag_move;
+            if (flag_move != 0U) {
+                control_stop_pending |= CONTROL_STOP_KEY;
+                flag_move = 0U;
+            } else {
+                /* Explicit user restart starts a new diagnostic trial. */
+                if (control_stop_pending == CONTROL_STOP_NONE) {
+                    control_stop_trace_reset(&control_stop_trace);
+                }
+                flag_move = 1U;
+            }
+            pickup_accel_guard_reset(&pickup_accel_guard);
             buzzers[0].beep(&buzzers[0], 1000, 100, 100, 1);
             break;
 
@@ -579,7 +631,9 @@ uint8_t turn_off(float angle) {
  */
 void get_angle(uint8_t way) {
 
-    qmi8658_app_read_data(&qmi8658_handle, &imu_data);
+    control_imu_valid =
+        (qmi8658_app_read_data(&qmi8658_handle, &imu_data) == IMU_OK);
+    control_imu_cycles = DWT->CYCCNT;
     temperature = imu_data.temperature;  //读取 IMU 内置温度传感器数据，近似表示主板温度。
 
     const float accel_x = imu_data.accel[0];
@@ -715,18 +769,22 @@ int myabs(int a) {
  *
  * @return int 1:小车被拿起  0：小车未被拿起
  */
-int pick_up() {
-			//小车的Z轴加速度过大或者轮胎因为正反馈达到转速阈值
-			if (voltage >11.0){ //电池电量会影响电机最大转速
-					if(myabs(velocity_left)+myabs(velocity_right)>180 || acceleration_z > 1.7 ) {
-						return 1;  //检测到小车被拿起
-				}
-			}else {
-					if(myabs(velocity_left)+myabs(velocity_right)>170 || acceleration_z > 1.7) {
-						return 1;  //检测到小车被拿起
-				}
-			}	
-    return 0;
+int pick_up(void) {
+    uint8_t reason = CONTROL_STOP_NONE;
+    const uint32_t cycles_per_ms = SystemCoreClock / 1000U;
+    /* Preserve the original integer truncation and voltage-dependent limits. */
+    const int speed_limit = (voltage > 11.0f) ? 180 : 170;
+    if (myabs(velocity_left) + myabs(velocity_right) > speed_limit) {
+        reason |= CONTROL_STOP_SPD;
+    }
+    if (pickup_accel_guard_update(&pickup_accel_guard, control_imu_cycles,
+            cycles_per_ms * PICKUP_ACCEL_CONFIRM_MS,
+            cycles_per_ms * PICKUP_ACCEL_MAX_GAP_MS,
+            acceleration_z, control_imu_valid)) {
+        reason |= CONTROL_STOP_ACC;
+    }
+    control_stop_pending |= reason;
+    return reason != CONTROL_STOP_NONE;
 }
 
 /**
@@ -1271,51 +1329,37 @@ void lidar_straight(void) {
 }
 
 /**
- * @brief 处理低电压报警逻辑 (非阻塞状态机)
+ * @brief 主循环中的有界电压采样、滤波与低压报警
  * @note  此函数应在主控制循环中被周期性调用。
  */
 
 void handle_low_voltage_alarm(void)
 {
-    // --- 1. 检查是否进入低电压状态 ---
-    if (voltage > 5.0f && voltage < LOW_VOLTAGE_THRESHOLD) {
-        
-        // --- 2. 如果电压低，则运行报警状态机 ---
-        uint32_t current_tick = HAL_GetTick();
+    static uint8_t initialized;
+    static uint32_t last_sample_cycles;
+    uint32_t now_cycles = DWT->CYCCNT;
+    const uint32_t sample_period_cycles = SystemCoreClock / 10U;
 
-        switch (alarm_state) {
-            
-            case ALARM_STATE_IDLE:
-                // 从正常状态第一次进入低电压状态
-                // 立即开始鸣响
-								buzzers[0].beep(&buzzers[0], 1000, 50, 50, 2); 
-                alarm_state = ALARM_STATE_BEEPING;
-                alarm_timer = current_tick; // 记录鸣响开始时间
-                break;
-
-            case ALARM_STATE_BEEPING:
-                // 正在鸣响状态，检查鸣响时间是否结束
-                if (current_tick - alarm_timer >= 50) {
-                    // 鸣响结束，进入静默期
-                    alarm_state = ALARM_STATE_SILENT;
-                    alarm_timer = current_tick; // 记录静默期开始时间
-                }
-                break;
-
-            case ALARM_STATE_SILENT:
-                // 正在静默期，检查静默时间是否结束
-                if (current_tick - alarm_timer >= BEEP_OFF_DURATION) {
-                    // 静默期结束，返回到IDLE状态，准备下一次鸣响
-                    // 在下一次调用此函数时，会因为状态是IDLE而立即再次鸣响
-                    alarm_state = ALARM_STATE_IDLE;
-                }
-                break;
+    if (initialized == 0U) {
+        battery_monitor_init(&battery_monitor, SystemCoreClock / 1000U);
+        last_sample_cycles = now_cycles - sample_period_cycles;
+        initialized = 1U;
+    }
+    battery_monitor_tick(&battery_monitor, now_cycles);
+    if ((uint32_t)(now_cycles - last_sample_cycles) >= sample_period_cycles) {
+        /* ADC1 is used only in main; CCD frames and battery reads serialize. */
+        const int raw_cv = get_battery_volt();
+        now_cycles = DWT->CYCCNT;
+        last_sample_cycles = now_cycles;
+        if (raw_cv >= 0) {
+            /* Keep the unfiltered value for the existing SPD voltage branch. */
+            voltage = (float)raw_cv / 100.0f;
         }
-
-    } else {
-        // --- 3. 如果电压恢复正常 ---
-        // 立即重置报警状态机到空闲状态
-        alarm_state = ALARM_STATE_IDLE;
+        battery_monitor_sample(&battery_monitor, now_cycles, raw_cv,
+                               (uint8_t)(raw_cv >= 0));
+    }
+    if (battery_monitor_alarm_due(&battery_monitor, now_cycles) != 0U) {
+        buzzers[0].beep(&buzzers[0], 1000, 50, 50, 2);
     }
 }
 

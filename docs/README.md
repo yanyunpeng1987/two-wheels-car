@@ -1,0 +1,22 @@
+# 开发文档入口
+
+本仓库统一管理 BalanceCar 设备固件与 MVTBOT Android 控制应用。后续任务从需求台账开始，代码、协议、版本和验收记录随同一次变更更新。
+
+| 文档 | 负责的内容 |
+|---|---|
+| [需求台账](REQUIREMENTS.md) | 需求 ID、范围、当前状态、验收与下一步；当前工作优先看这里 |
+| [版本与联调矩阵](RELEASE_MATRIX.md) | 仓库版本、APK/固件组合、验证层级及本地实验边界 |
+| [通信协议基线](PROTOCOL.md) | 当前源码行为、传输边界与两端变更约定 |
+| [贡献流程](../CONTRIBUTING.md) | 分支、并行开发、验证、PR 与回退 |
+| [设备端开发记录](DEVELOPMENT_LOG.md) | 设备端已发生的修改、构建和实测证据，按时间追加 |
+| [设备端问题登记](KNOWN_ISSUES.md) | KI 编号的现象、证据与处理状态 |
+| [Android 开发入口](ANDROID_MVTBOT.md) | APP 项目结构、交接、构建和历史证据导航 |
+| [Android 交接](../Android/MVTBOT/docs/HANDOFF.md) | APP-001/002、历史版本与原始材料可信度 |
+| [工程基线](BASELINE.md) | Keil、Flash 布局、原始导入边界 |
+| [阶段变更](../CHANGELOG.md) | 进入版本管理的阶段变化，不代替详细证据 |
+
+文件归属：`Firmware/` 放设备源码；`Android/MVTBOT/` 放 APP 维护入口；`docs/` 放跨端需求/协议/验收；`tools/` 放通用检查；`tests/` 放设备端主机回归。已有原始材料保持原位置，不复制成第二套有效源码。
+
+需求状态以需求台账为准；具体问题根因与证据以问题文档为准；实际发布组合以版本矩阵为准。历史日志不回写成今天的结论。发现矛盾时补充当前状态和依据，保留历史记录。
+
+新 clone 可以检查和构建设备固件；APK 还需恢复本地材料，步骤见 [Android README](../Android/MVTBOT/README.md)。GitHub 不是 Android 完整材料或签名备份。

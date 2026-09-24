@@ -256,6 +256,41 @@ def transform(relative, text, ui_fixed=False):
         text = prepend(text, "onPause()V", f"    invoke-static {{}}, {LINK}->release()V\n    invoke-static {{}}, {MAIN}->mvtbotPauseLink()V")
         text = prepend(text, "onResume()V", f"    const/4 v0, 0x1\n    invoke-static {{v0}}, {LINK}->foreground(Z)V")
         text = prepend(text, "onDestroy()V", f"    invoke-static {{}}, {LINK}->destroy()V")
+        text = wrap(text, "setState(Z)V", f"""
+    .locals 3
+    invoke-static {{}}, {LINK}->isOwned()Z
+    move-result v0
+    if-eqz v0, :link_legacy
+    invoke-static {{}}, {LINK}->isReady()Z
+    move-result v0
+    sput-boolean v0, {MAIN}->isConnected:Z
+    iget-object v1, p0, {MAIN}->bluetoothBtn:Landroid/widget/ImageButton;
+    if-eqz v0, :link_disconnected
+    const v2, 0x7f0700d9
+    goto :link_icon
+    :link_disconnected
+    const v2, 0x7f070116
+    :link_icon
+    invoke-virtual {{v1, v2}}, Landroid/widget/ImageButton;->setBackgroundResource(I)V
+    return-void
+    :link_legacy
+    invoke-direct {{p0, p1}}, {MAIN}->setState$v21(Z)V
+    return-void
+""")
+        # The v21 MiniBalan page's bluetoothReflectsConnection flag also redraws
+        # the connected icon during page/resume refresh, independently of setState.
+        text = wrap(text, "viewChangeButtons(Lcom/Wonder/bot/Device;)V", f"""
+    .locals 1
+    invoke-direct {{p0, p1}}, {MAIN}->viewChangeButtons$v21(Lcom/Wonder/bot/Device;)V
+    invoke-static {{}}, {LINK}->isOwned()Z
+    move-result v0
+    if-eqz v0, :link_done
+    invoke-static {{}}, {LINK}->isReady()Z
+    move-result v0
+    invoke-direct {{p0, v0}}, {MAIN}->setState(Z)V
+    :link_done
+    return-void
+""")
         text = wrap(text, "switchToBluetoothDevicePage(Ljava/lang/String;)V", f"""
     .locals 1
 {owned_guard()}

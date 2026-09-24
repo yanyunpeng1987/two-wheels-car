@@ -20,7 +20,10 @@ param(
     [switch]$Unsigned,
     [switch]$BaselineOnly,
     [switch]$RollbackUiOnly,
-    [string]$Python = 'python'
+    [string]$Python = 'python',
+    [int]$VersionCode = 0,
+    [string]$VersionName,
+    [string]$DebugAutoConnectTarget
 )
 
 $ErrorActionPreference = 'Stop'
@@ -165,6 +168,10 @@ $report = [ordered]@{
 
 try {
     if ($BaselineOnly -and $RollbackUiOnly) { throw 'Choose BaselineOnly or RollbackUiOnly, not both.' }
+    if (($VersionCode -gt 0) -ne [bool]$VersionName) { throw 'Supply VersionCode and VersionName together.' }
+    if ($BaselineOnly -and $VersionCode -gt 0) { throw 'Version overrides require a composed build.' }
+    if ($DebugAutoConnectTarget -and ($BaselineOnly -or $RollbackUiOnly)) { throw 'Debug auto-connect requires the LINK business build.' }
+    if ($DebugAutoConnectTarget -and $DebugAutoConnectTarget -notmatch '^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$') { throw 'Debug auto-connect requires one explicit Bluetooth address.' }
     if (-not $ModuleRoot) { $ModuleRoot = Split-Path -Parent $PSScriptRoot }
     $ModuleRoot = Resolve-FileSystemPath $ModuleRoot
     $sourceProject = Join-Path $ModuleRoot 'project'
@@ -258,6 +265,8 @@ try {
             '--java-home', $JavaHome, '--android-sdk', $AndroidSdk, '--apktool', $ApktoolJar,
             '--build-tools-version', $BuildToolsVersion)
         if ($RollbackUiOnly) { $prepareArguments += '--rollback-ui-only' }
+        if ($VersionCode -gt 0) { $prepareArguments += @('--version-code', [string]$VersionCode, '--version-name', $VersionName) }
+        if ($DebugAutoConnectTarget) { $prepareArguments += @('--debug-auto-connect-target', $DebugAutoConnectTarget) }
         $null = Invoke-BuildTool $Python $prepareArguments (Join-Path $OutputDirectory 'link-prepare.log')
         $report.linkBuild = Get-Content -LiteralPath (Join-Path $OutputDirectory 'link-build.json') -Raw | ConvertFrom-Json
     }

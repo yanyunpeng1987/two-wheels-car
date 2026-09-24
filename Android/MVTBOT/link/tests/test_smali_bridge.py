@@ -131,6 +131,10 @@ def main():
         assert '->isReady()Z' in manager and '->connect$v21' in manager
         assert '->bind(Landroid/content/Context;Landroid/os/Handler;)V' in main
         assert '->foreground(Z)V' in main and '->destroy()V' in main
+        state = patch.find_method(main, 'setState(Z)V')
+        assert '->isReady()Z' in state and '0x7f070116' in state and '->setState$v21(Z)V' in state
+        refresh = patch.find_method(main, 'viewChangeButtons(Lcom/Wonder/bot/Device;)V')
+        assert '->setState(Z)V' in refresh and '->isOwned()Z' in refresh
         assert '.implements Lcom/mvtbot/link/MiniBalanLink$ControlReset;' in control
         assert '->gravity(Lcom/mvtbot/link/MiniBalanLink$ControlReset;FF)I' in control
         assert '->motion(Lcom/mvtbot/link/MiniBalanLink$ControlReset;II)V' in control

@@ -16,6 +16,24 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def write_debug_autoconnect(snapshot, target, rollback=False):
+    """Only explicit diagnostic builds carry a local device address."""
+    relative = "assets/mvtbot-debug-autoconnect.properties"
+    asset = snapshot / relative
+    if asset.exists():
+        raise ValueError("Unexpected debug auto-connect asset in the input")
+    if target is None:
+        return {"enabled": False}
+    if rollback or not re.fullmatch(r"[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}", target):
+        raise ValueError("Debug auto-connect requires a LINK build and an explicit Bluetooth address")
+    target = target.upper()
+    if target in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"):
+        raise ValueError("Invalid debug Bluetooth target")
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_bytes(("enabled=true\ntargetAddress=" + target + "\n").encode("ascii"))
+    return {"enabled": True, "asset": relative, "sha256": sha(asset), "addressSuffix": target[-5:]}
+
+
 def run(args, log):
     with log.open("w", encoding="utf-8") as stream:
         result = subprocess.run([str(a) for a in args], stdout=stream,
@@ -47,6 +65,9 @@ def main():
     ap.add_argument("--apktool", type=Path, required=True)
     ap.add_argument("--build-tools-version", default="36.0.0")
     ap.add_argument("--rollback-ui-only", action="store_true")
+    ap.add_argument("--version-code", type=int)
+    ap.add_argument("--version-name")
+    ap.add_argument("--debug-auto-connect-target")
     args = ap.parse_args()
     module, snapshot, output = (p.resolve() for p in (args.module_root, args.snapshot, args.output))
     if snapshot == (module / "project").resolve() or not snapshot.is_relative_to(output):
@@ -54,7 +75,15 @@ def main():
     baseline = verify_snapshot(module, snapshot)
     config = snapshot / "apktool.yml"
     text = config.read_text(encoding="utf-8")
-    version, name = (25, "2.3.6-mvtbot.3-ui-rollback") if args.rollback_ui_only else (24, "2.3.6-mvtbot.4-hc05d")
+    version, name = (37, "2.3.6-mvtbot.10-ui-rollback") if args.rollback_ui_only else (36, "2.3.6-mvtbot.10-hc05d")
+    if args.debug_auto_connect_target is not None:
+        name += "-diag"
+    if (args.version_code is None) != (args.version_name is None):
+        raise ValueError("Version code and name overrides must be supplied together")
+    if args.version_code is not None:
+        if args.version_code <= 21 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,120}", args.version_name):
+            raise ValueError("Version override must advance the baseline and use a plain version name")
+        version, name = args.version_code, args.version_name
     text, count = re.subn(r"(?m)^(  versionCode:) 21$", rf"\g<1> {version}", text)
     if count != 1:
         raise ValueError("Missing exact versionCode 21 baseline")
@@ -65,6 +94,7 @@ def main():
     report = {"mode": "ui-rollback" if args.rollback_ui_only else "hc05d-ui",
               "versionCode": version, "versionName": name, "baselineVerified": True,
               "sourceProjectModified": False, "deviceOperations": False}
+    report["debugAutoConnect"] = write_debug_autoconnect(snapshot, args.debug_auto_connect_target, args.rollback_ui_only)
     java, javac = (args.java_home / "bin" / n for n in ("java.exe", "javac.exe"))
     android = args.android_sdk / "platforms/android-36/android.jar"
     d8 = args.android_sdk / "build-tools" / args.build_tools_version / "lib/d8.jar"

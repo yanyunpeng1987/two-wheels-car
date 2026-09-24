@@ -89,6 +89,16 @@ def main():
         names = z.namelist()
         if len(set(names)) != len(names):
             raise ValueError("Duplicate APK entries")
+        debug_name = "assets/mvtbot-debug-autoconnect.properties"
+        debug_asset = args.snapshot / debug_name
+        if debug_asset.is_file():
+            if args.rollback_ui_only or debug_name not in names or z.read(debug_name) != debug_asset.read_bytes():
+                raise ValueError("Debug auto-connect asset differs from the explicit build input")
+            debug_config = {"enabled": True, "assetSha256": hashlib.sha256(z.read(debug_name)).hexdigest()}
+        else:
+            if debug_name in names:
+                raise ValueError("Normal build unexpectedly contains debug auto-connect configuration")
+            debug_config = {"enabled": False}
         dex_names = {n for n in names if n.startswith("classes") and n.endswith(".dex") and "/" not in n}
         required = set(expected) if args.rollback_ui_only else set(expected) | {"classes4.dex"}
         if dex_names != required:
@@ -112,7 +122,7 @@ def main():
     if rows["classes.dex"]["sha256"] == expected["classes.dex"]:
         raise ValueError("Primary DEX was not rebuilt")
     if not args.rollback_ui_only:
-        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation")}
+        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation", "DebugAutoConnect")}
         if not required <= dexes["classes4.dex"].classes:
             raise ValueError("New LINK-001 classes are missing")
         refs = {m for m in dexes["classes.dex"].methods if m.startswith("Lcom/mvtbot/link/")}
@@ -125,7 +135,7 @@ def main():
         refs = set()
     report = {"status": "PASS", "mode": "rollback-ui-only" if args.rollback_ui_only else "hc05d",
               "dex": rows, "resolvedBridgeMethods": sorted(refs), "uniqueClasses": len(classes),
-              "runtimeArtVerified": False, "deviceOperations": False}
+              "runtimeArtVerified": False, "deviceOperations": False, "debugAutoConnect": debug_config}
     args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"PASS: {len(dexes)} DEX files, {len(refs)} resolved bridge methods, {len(classes)} unique classes")
 

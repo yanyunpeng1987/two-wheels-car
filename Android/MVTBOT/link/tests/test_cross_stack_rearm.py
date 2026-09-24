@@ -63,7 +63,7 @@ public final class CrossStackRearmTest {
         List<Long> freshZeros = new ArrayList<>();
         for (int i = 0; i < gatt.writes.size(); ++i) {
             String wire = gatt.writes.get(i);
-            long at = gatt.times.get(i);
+            long at = gatt.writeTimes.get(i);
             if (at >= freshAt && wire.equals("CMD|3|0|0|$")) freshZeros.add(at);
             if (!wire.equals("CMD|3|0|0|$")) {
                 check(direction != 0, scenario + ": released gesture cannot emit motion");
@@ -80,7 +80,7 @@ public final class CrossStackRearmTest {
                 }
             }
             // Normalize each scenario to the first subscription-time zero.
-            System.out.println("TRACE " + scenario + " " + (at - gatt.times.get(0)) + " " + wire);
+            System.out.println("TRACE " + scenario + " " + (at - gatt.writeTimes.get(0)) + " " + wire);
         }
         check(direction == 0 || firstMotion >= 0, scenario + ": fresh motion eventually sent");
     }
@@ -134,12 +134,6 @@ public final class CrossStackRearmTest {
 '''
 
 
-def replace_once(source: str, before: str, after: str) -> str:
-    if source.count(before) != 1:
-        raise RuntimeError(f"Android fixture changed: expected one {before!r}")
-    return source.replace(before, after, 1)
-
-
 def run(command: list[str], *, cwd: Path, input_text: str | None = None) -> str:
     result = subprocess.run(command, cwd=cwd, input=input_text,
                             capture_output=True, text=True)
@@ -165,12 +159,8 @@ def main() -> None:
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
     stubs = dict(fixture.STUBS)
-    gatt = replace_once(stubs["android/bluetooth/BluetoothGatt.java"],
-                        "public List<Integer> types=",
-                        "public List<Long> times=new ArrayList<>();public List<Integer> types=")
-    stubs["android/bluetooth/BluetoothGatt.java"] = replace_once(
-        gatt, "writes.add(new String(",
-        "times.add(android.os.Handler.now);writes.add(new String(")
+    # The shared Android fixture records actual write submission timestamps.
+    # Reuse that interface instead of rewriting the fixture's Java statements.
 
     java_inputs: list[Path] = []
     for name, source in stubs.items():
@@ -182,8 +172,7 @@ def main() -> None:
     test.parent.mkdir(parents=True, exist_ok=True)
     test.write_text(JAVA, encoding="utf-8")
     java_inputs.append(test)
-    actual_java = [here.parent / "src/com/mvtbot/link" / name for name in
-                   ("FrameDecoder.java", "ProtocolValidation.java", "MiniBalanLink.java")]
+    actual_java = sorted((here.parent / "src").rglob("*.java"))
     java_inputs += actual_java
     classes = output / "classes"
     classes.mkdir(exist_ok=True)

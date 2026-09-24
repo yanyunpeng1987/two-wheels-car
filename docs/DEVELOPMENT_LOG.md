@@ -157,3 +157,5 @@ GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，o
 回退可revert本次管理提交；原始材料与设备固件未被重排或删除。GitHub源码并不包含恢复APK所需全部本地输入，备份须另外保留。
 
 管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。
+
+管理文件同步回日常主工作区时保留原分支与未提交内容；同步前后383个Firmware/tests文件哈希一致，原T2日志与停机测试CI步骤保留。主目录Android实际输入、76输入工程及VS Code同步检查通过。此次同步的文件版本已在管理分支，后续提交须按需求选路径或整合分支，不能整体暂存共享工作区。

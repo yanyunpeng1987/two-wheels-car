@@ -12,3 +12,14 @@
 每个变更至少关联需求/问题编号，并记录 APP 包名、版本、APK 哈希、签名证书、设备端版本与协议影响，以及构建、安装、实机测试各自结果。尚未进行的验证应明确写为未验证。
 
 `python tools/verify_android.py --project-root <本地project目录>` 和 `Verify-Import.py --include-project` 检查的是不可变的导入基线。正式修改后检查失败是预期的差异提示，必须先保存并版本化修改；不得为通过检查而覆盖工程或重写历史基线。现有原始日志、发行包和清单继续保留原字节。
+
+## LINK-001 的已实现路径
+
+本需求采用自有 Java 组件 `link/src/` 与 `LINK-001/` 最小 smali 补丁。默认
+`Build-MVTBOT.ps1` 调用 `prepare_link_build.py`，在快照中验证完整 v21 输入、
+重新解码归档APK、校验并应用补丁、重建主DEX及D8辅助DEX。最终
+`verify_link_apk.py` 核验编译产物与APK字节一致、原classes2/3不变、桥接
+方法可解析且没有重复类。原始 `project/` 和不可变 v21 清单继续保留。
+
+前文“尚未实现”的叙述属于导入时的历史基线；本需求新增了业务构建链，
+其本机构建与实际设备证据分别记录在 `docs/HC05D_COMPATIBILITY.md`。

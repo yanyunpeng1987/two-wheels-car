@@ -35,3 +35,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Android/MVTBOT/tools/Build-M
 完成后在本目录记录本地验证结果；手机安装、界面实测和车辆联调分别记录，未进行的项目保持待验证。设备操作不由构建脚本执行。
 
 源码回退：停止传入本补丁目录，使用保留的 v21 输入重建。手机已升级后不能假设低 versionCode 可直接覆盖安装；应用降级/卸载及数据处理需另行确定。历史 v21 APK 保留，绝不覆盖。
+
+## HC-05D 合并交付
+
+上述 v22 命令/证据保留为界面任务历史。用户后续要求与 LINK-001 合并，当前工作区默认 `Build-MVTBOT.ps1` 从固定 v21 先应用本补丁，再组合通信补丁，生成 v24。最终成品同时验证UI门禁和LINK桥接；本补丁的JSON原字节与来源提交继续保留。`-RollbackUiOnly`生成保留本界面改动、撤回LINK通信逻辑的v25，用于搭配T4回退。详见仓库 `docs/HC05D_COMPATIBILITY.md`。

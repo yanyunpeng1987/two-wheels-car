@@ -149,6 +149,11 @@ try {
         }
     }
     if ($exitCode -eq 1) { Write-Warning 'Build succeeded with warnings; inspect the build log.' }
+    $stackVerifier = Join-Path $workspace 'tools\verify_firmware_stack.py'
+    if (Test-Path -LiteralPath $stackVerifier -PathType Leaf) {
+        & python $stackVerifier --report (Join-Path $outputDirectory 'stack-verification.json')
+        if ($LASTEXITCODE -ne 0) { throw 'The Keil call graph exceeds the reserved stack budget.' }
+    }
     Write-Host "$Action succeeded. Outputs: $outputDirectory"
     # UV4 code 1 means warnings only; report success to VS Code tasks.
     exit 0

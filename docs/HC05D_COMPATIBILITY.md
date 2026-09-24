@@ -1,0 +1,99 @@
+# HC-05D BLE 兼容与通信可靠性
+
+需求：LINK-001/002/003、APP-SRC-001、APP-REL-001/002。实现以 MVTBOT v21 和本地 T4 固件为基线。首版使用 BLE，不增加 SPP。本文区分软件实现、主机回归、实物验收；构建成功不代表小车已通过验收。
+
+## 基线与工作区
+
+- 原源码 HEAD：`82f3b45dbb5641d7eff4907332651760ccf77f77`。
+- 本需求独立工作区：`Two-wheels-Car-hc05d`，分支 `codex/hc05d-ble-reliability`。
+- 既有 T4 固件及 Android 管理资料单独冻结为 `946112ef29bd971cb981948d300394f60d533c2f`；本需求差异应相对此提交审查。它不是 main 已合入或整车已验收的声明。
+- 冻结源文件逐项哈希、原工作区状态及旧 HEX/MAP/AXF 位于本地 `build/hc05d-baseline/`。复制时核对了 433 个源文件未发生并发变化。
+- 旧 T4 HEX：`3986cf56d190009946df4338f6b5cdd13ce72849bf95478a187142cd695d1271`。
+- v21 APK：`6b27d6af2261b0f4d559828f9fcc6df1a9e3f464c0d8b592278ceadc1a98463e`。原始 project/materials 独立复制，本需求不覆盖原工作区和原始输入。
+
+## 模块配置与接线
+
+资料来源为用户提供的 `E:\HC-05蓝牙模块资料` 中 HC-05D 手册和载板图片，不能套用普通 HC-05、兼容单从版的指令。
+
+| 项目 | 首版配置 / 核查 |
+|---|---|
+| 型号 | 确认实物为 HC-05D，记录固件版本；本地资料不是实物识别证据 |
+| 无线角色 | BLE 从机 `AT+ROLE=3`；不使用 SPP/主机/桥接模式 |
+| 数据串口 | `AT+UART=9600,0,0`，9600、8N1、无流控 |
+| 名称 | 可保留 `HC-05D`；名称不是协议或设备身份依据 |
+| 默认 BLE 服务 | `E0FF`；兼容原模块 `FFE0`，均使用标准 Bluetooth UUID 基址 |
+| 写入和通知 | 所选服务内 `FFE1`，按属性确定实际句柄；允许同一或不同特征 |
+| MCU PC6 / USART6_TX | 接模块 RXD |
+| MCU PC7 / USART6_RX | 接模块 TXD |
+| GND | 共地 |
+| 电源 | HC-05D 载板图片标注 3.3～6.0V；接电前以实际载板标注及稳压结构核对，不将载板和裸模块参数混用 |
+| UART 电平 | 3.3V TTL；载板接受 5V 供电不意味着信号为 5V |
+| KEY/AT、STATE | 正常运行保持数据模式；首版不依赖 STATE，也不增加 MCU 开机 AT 流程 |
+
+独立配置步骤：先确认实物引脚与版本，再使用 USB-UART 配置。按手册，KEY 先置高再上电的 AT 模式使用 38400；其他进入方式可能使用当前串口速率。不得根据数据波特率猜 AT 波特率。
+
+1. 查询 `AT+VERSION?`、`AT+ROLE?`、`AT+UART?`、`AT+NAME?`，保存应答。
+2. 按上表设置 ROLE/UART；查询 `AT+LESADVUUID?`、`AT+LESSERUUID?`、`AT+LESWUUID?`、`AT+LESRUUID?`。正常默认为 E0FF/E0FF/FFE1/FFE1，无需为了 APK 强制改成 FFE0。
+3. 退出 AT 模式，按正常方式重新上电；再次查询确认参数保持，再核验手机可见的真实 GATT 服务、特征属性和 2902 描述符。
+4. 记录连接目标与实物对应关系，之后才连接车端 UART。模块配置未由本次本地构建自动执行。
+
+## Android 行为与维护方式
+
+- 合并 APP-UI-001/002/003：取消原启动动画及3秒等待，固定进入MiniBalan并关闭机型抽屉，信息页使用杭州矩视科技有限公司与 `http://www.mvtlabs.com/`，移除原logo/邮箱/公众号。
+- UI补丁与LINK补丁共同修改MainActivity，先应用固定UI补丁，再在其强制MiniBalan的位置接入LINK会话；不以整文件覆盖合并。最终APK重新解码，核查布局/语言/资源ID/页面入口及全部主DEX类。
+
+- MiniBalan 采用独立 GATT 会话和固定会话代次，协议跟随选定产品，不跟随设备名。
+- 同时支持 E0FF 和 FFE0，优先 E0FF；同一服务内必须唯一确定写入和 Notify 特征。拒绝歧义，不跨服务拼接句柄。
+- 仅在服务、特征、通知订阅全部成功后变为 ready；准备超时 10 秒。无响应写有序限速，有响应写等待回调并设超时。传输成功不等于 MCU 已执行。
+- 按 `CMD|…$` 组帧，最多 128 个线上 ASCII 字节；跨通知、粘包、坏数字、NUL、超长及重连残留均由有界解析器处理。保留诊断计数和受限原始异常样本，不删除坏字节来修复数字。
+- 支持原 CMD4/5/6/7/8 遥测、CMD1～8 命令及原字段顺序。UI 兼容层可补可选末尾分隔符，不改写原始异常证据。
+- 新代码位于 `Android/MVTBOT/link/`；最小桥接和固定基线检查位于 `changes/LINK-001/`。原始第三方反编译树与 APK 留在本地，不进入 Git。
+- 构建保留 v21 为输入，在快照中重新解码/补丁/汇编主 DEX，Java/D8 生成辅助 DEX；其余原 DEX 保持不变。检查类重复、方法数、桥接签名和最终 APK 字节。签名沿用原证书。
+
+## MCU 行为与失联约定
+
+- USART6 保持原引脚和 9600/8N1。串口只传业务数据，没有 AT 初始化。
+- 查询发送使用 4 槽 FIFO，周期 CMD4/5/6 各保留一条最新值，另有独立 active DMA 槽。发送中不覆盖 active；查询优先，遥测拥塞合并并计数，不在主循环忙等或固定延时。
+- RX 使用 8×128 字节块及收包时间/代次。Normal DMA 禁用 HT，仅正确处理 IDLE/完成事件；重启失败、UART 错误或接收溢出触发恢复和遥控锁定。
+- APP 可见有效控制页按 100ms 更新最新 CMD3；运动不排历史队列。松手/离页/后台立即尝试零指令并停止运动心跳，重新操作前先中立。
+- MCU 500ms 无有效 CMD3，下一控制周期清除蓝牙方向；以实际收包时间续期，其他查询、坏帧和过期积压不能续期。
+- 上电、超时、退出 Normal、接收错误后，必须收到本轮新零 CMD3 才允许新非零。主循环主动重置旧代次RX并保留新块；APP新操作使用间隔至少100ms的两条零指令重新使能，完成前不发送非零。松手、页面或连接变化取消旧重新使能过程。
+- Keil调用图显示新增路径已知主栈1116B、控制ISR752B，原1KB预留不足；将启动栈提高到4KB，构建执行 `tools/verify_firmware_stack.py`。未知间接调用与实机栈峰值仍需验证。
+- 守卫用原始 DWT 无符号差值处理回绕，方向在短临界区一致发布。仅清蓝牙请求，不改变 flag_move、平衡 PID、PWM 输出开关、手柄/语音优先级。
+- 500ms 是指令有效期，不是精确物理停车时间。实际控制 ISR 延迟、惯性及制动行为需要实测。
+- 原模块兼容指新 APP＋新固件。旧 APP 没有持续心跳，运动可能在 500ms 后被保护清零，不属于完整兼容组合。
+
+## 构建与回归
+
+```powershell
+python tools/verify_android.py --project-root Android/MVTBOT/project
+python tools/sync_vscode.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -Action Rebuild
+python tools/verify_project.py --artifacts
+python tests/run_bluetooth_tests.py --cc <gcc-or-zig-path>
+python Android/MVTBOT/link/tests/run_protocol_tests.py --java-home <JDK21>
+python Android/MVTBOT/link/tests/test_ble_session.py --java-home <JDK21>
+python Android/MVTBOT/link/tests/test_smali_bridge.py
+python Android/MVTBOT/link/tests/test_combined_ui_link.py
+python Android/MVTBOT/link/tests/test_cross_stack_rearm.py --java-home <JDK21> --cc <gcc-or-zig-path>
+powershell -NoProfile -ExecutionPolicy Bypass -File Android/MVTBOT/tools/Build-MVTBOT.ps1
+```
+
+检测到并行 APP-UI-001 已占用 versionCode 22，本任务发布号调整为24、保留新界面的旧通信逻辑回退包为25。用户随后明确要求合并界面。已固定导入 APP-UI-001 的提交 `aa000240b183a8daeed3f09ca084cdf9335e0076`，默认按 UI→LINK 顺序从同一v21输入组合，MainActivity的共同方法保留两方行为。
+
+默认构建 v24 HC-05D。`-BaselineOnly` 重建原 v21；`-RollbackUiOnly` 构建同签名 v25、保留界面改动但撤回通信逻辑的回退包，避免在 v24 上直接降版本。回退包仅适用于本轮版本组合；以后如已安装更高版本，需重新安排版本号；回退到25后不能直接覆盖安装24。固件与模块配置同步回退，不能将旧 APP 配新守卫当作完整回退。
+
+主机测试覆盖完整帧各拆分位置、坏数字/NUL、长度极限、会话清理、GATT 失败/超时、DMA 所有权/回调事件、接收积压和 499/500/501ms、DWT 回绕、中立重解锁。原手柄、拿起保护、启动和电压回归同时执行。Android fake 与 HAL stub 不代表真实蓝牙、Android ART/UI 或电机行为。
+
+## 实物验收表（待执行）
+
+| 场景 | 通过条件 | 当前证据 |
+|---|---|---|
+| 实物与配置 | 确认 HC-05D/固件版本/供电引脚；参数断电保持 | 待实物核查 |
+| GATT 连接 | HC-05D E0FF、原模块 FFE0 均 ready；权限拒绝/CCCD失败不误报成功 | 主机模型测试，实物待验 |
+| 静态通信 | 电压、PID长响应、遥测同时正常；记录 UART/通知/解析字节 | 待联调 |
+| 连续遥测 | 30分钟无闪退、无持续队列增长，错误计数可解释 | 待联调 |
+| 受控运动 | 前后转向、松手、后台、关蓝牙/模块断电、恢复连接；超时清运动且保持平衡 | 待受控实测 |
+| 其他功能 | 原手柄、拿起保护、启动、电压及模式切换未回归 | 主机回归，实车待验 |
+
+NUL 防闪退与 DMA 所有权修正不能证明历史 NUL 的唯一来源；继续保留旧原始日志和独立根因状态。手机安装、烧录、模块写配置及运动均未由构建脚本执行。

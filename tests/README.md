@@ -120,3 +120,21 @@ of the CCD channel. Integration checks require battery acquisition outside the
 control interrupt. These tests do not simulate analog interference or prove
 physical battery voltage; T4 must be checked on the vehicle alongside T3's
 retained encoder filtering and control behavior.
+
+## HC-05D link framing, DMA ownership and motion lease
+
+```sh
+python3 tests/run_bluetooth_tests.py --cc gcc
+```
+
+This compiles the actual portable `bluetooth_link.c` and the actual `bluetooth.c`
+HAL adapter against bounded test doubles. It covers strict fields, fragments,
+128-byte boundaries, DWT wrap, 500ms expiry, fresh-neutral rearming, stamped RX
+backlog, HT/IDLE/TC, UART/restart failures, immutable active DMA buffers, query
+priority and telemetry coalescing. The integration check verifies placement of
+the guard after mode selection and before control consumers. On Windows, `--cc`
+can name the existing isolated Zig executable; no global compiler is changed.
+
+Android JVM/state tests are under `Android/MVTBOT/link/tests`; bridge replay
+requires the private v21 smali inputs. These tests do not execute Android ART,
+the BLE radio or physical motion. See `docs/HC05D_COMPATIBILITY.md`.

@@ -2,7 +2,7 @@
 
 此目录是“两轮自平衡小车”的 Android 开发资料入口，2026-09-24 从“提取 Wonderbot APK”任务汇总。设备端继续使用仓库根目录的 `Firmware/`。
 
-**当前基线：MVTBOT 2.3.6-mvtbot.2，versionCode 21。** 已在 2026-09-16 安装到 Xiaomi 13，图标版保留原始 DEX。蓝牙 NUL 解析闪退仍未修复，待结合设备端日志继续定位；历史安装证据不等于手机当前状态。
+**不可变输入基线：MVTBOT 2.3.6-mvtbot.2，versionCode 21。** 本轮 LINK-001 默认构建包含 APP-UI-001 界面改动的 HC-05D BLE 版 `2.3.6-mvtbot.4-hc05d (24)`，保留原包名和证书。新帧解析及防闪退已实现并通过主机测试，历史 NUL 上游来源仍未确认；手机与模块实测待完成。详见[跨端兼容说明](../../docs/HC05D_COMPATIBILITY.md)。
 
 ## 从这里开始
 
@@ -22,7 +22,8 @@
 | `tools/Build-MVTBOT.ps1` | 相对路径构建、对齐、同证书签名与校验；不安装到手机 |
 | `tools/Verify-Import.py` | 核验迁移材料的 SHA-256；可选择核验当前工程基线 |
 | `baseline/project-files.json` | 进入 Git 的 v21 工程指纹：1,445 个相对路径、大小、SHA-256；不包含源码或本机路径 |
-| `changes/README.md` | 后续补丁或独立原生工程的版本管理约定；当前尚未实现逻辑修改构建链 |
+| `changes/README.md`、`changes/LINK-001/` | 最小 smali 桥接、固定输入哈希与补丁重放 |
+| `link/src/`、`link/tests/` | 自有 Java BLE/协议实现及主机回归 |
 | `materials/deliverables/` | 之前所有正式交付，包括原始拆分包、v20/v21 APK及报告 |
 | `materials/history/v20-apktool-project/` | v20 的旧重建输入，供版本差异对照 |
 | `materials/analysis/original-base-apktool/` | 原始主包资源/smali 分析参考，不是完整单 APK 的当前工程 |
@@ -43,7 +44,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File Android/MVTBOT/tools/Build-MVTBOT.ps1
 ```
 
-构建脚本使用当前 `project/` 的快照，输出到 `Android/MVTBOT/build/<时间戳>/`。默认沿用本机原 MVTBOT 开发签名；没有签名材料的新电脑可加 `-Unsigned` 先验证重建。工具路径支持参数覆盖，具体参数见脚本帮助。
+构建脚本验证不可变 v21 `project/`，在快照中生成新业务 DEX，输出到 `Android/MVTBOT/build/<时间戳>/`。默认沿用本机原 MVTBOT 开发签名；没有签名材料的新电脑可加 `-Unsigned` 先验证重建。工具路径支持参数覆盖，具体参数见脚本帮助。
 
 本机已有工具默认位于 `%LOCALAPPDATA%\Programs\AndroidTools` 和 `%LOCALAPPDATA%\Android\Sdk`。Studio 自带 JBR 25，Gradle 工程使用 JDK 21；这两者不要混用。完整工具版本见历史环境记录，实际执行前以脚本检测为准。
 
@@ -74,6 +75,8 @@ python Android/MVTBOT/tools/Verify-Import.py --include-project
 
 `project/` 是派生的本地重建目录，Git clone 或新 worktree 不包含它与 `materials/`。APK 工作开始前须从完整归档恢复本地材料并核验；仅克隆仓库无法重建 APK。
 
-后续若在其中修改 smali/资源，按 [变更管理约定](changes/README.md) 同步保存明确补丁或新的版本化输入；如果建设正式 Android Studio 工程，应另建源码模块，不要把 JADX 的不完整输出当成现成源码。现有 `Build-MVTBOT.ps1` 保留并校验原始 DEX，适用于包装修改；当前没有业务 DEX 重建流程，不能据此宣称已支持逻辑迭代。
+业务改动遵循[变更管理约定](changes/README.md)。LINK-001 用自有 Java + 最小 smali 桥接，在快照中重建主 DEX和辅助 DEX，classes2/3 保持原样；最终检查方法签名、类唯一性和 APK 载荷。JADX 仍只供阅读，不能当成完整可构建工程。`-BaselineOnly` 重建原 v21；`-RollbackUiOnly` 生成保留新界面、旧通信逻辑、同签名且 versionCode 25 的本轮回退包。
 
 私钥及 DPAPI 密文仍位于 `%LOCALAPPDATA%\Android\Signing\MVTBOT`，不在本项目中。迁移到其他 Windows 账户前需要单独规划签名备份；仅复制 DPAPI 密文不能保证可用。
+
+用户已要求与APP-UI-001合并。默认v24同时包含新界面和HC-05D通信；保留原UI补丁的来源与验收，不以旧v22手机记录代替组合v24实测。最终成品还会重新解码核验UI规则及全部主DEX类。

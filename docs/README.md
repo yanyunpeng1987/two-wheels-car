@@ -6,6 +6,8 @@
 |---|---|
 | [需求台账](REQUIREMENTS.md) | 需求 ID、范围、当前状态、验收与下一步；当前工作优先看这里 |
 | [版本与联调矩阵](RELEASE_MATRIX.md) | 仓库版本、APK/固件组合、验证层级及本地实验边界 |
+| [HC-05D合并测试报告](HC05D_TEST_REPORT.md) | 统一APK/HEX哈希、主机/成品检查及待实机项目 |
+| [HC-05D兼容与验证](HC05D_COMPATIBILITY.md) | 模块配置、APK/MCU实现、失联契约、构建与实物验收 |
 | [通信协议基线](PROTOCOL.md) | 当前源码行为、传输边界与两端变更约定 |
 | [贡献流程](../CONTRIBUTING.md) | 分支、并行开发、验证、PR 与回退 |
 | [设备端开发记录](DEVELOPMENT_LOG.md) | 设备端已发生的修改、构建和实测证据，按时间追加 |

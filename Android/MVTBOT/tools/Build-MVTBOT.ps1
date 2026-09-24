@@ -17,7 +17,10 @@ param(
     [string]$BuildToolsVersion = '36.0.0',
     [string]$KeyStorePath,
     [string]$PasswordFile,
-    [switch]$Unsigned
+    [switch]$Unsigned,
+    [switch]$BaselineOnly,
+    [switch]$RollbackUiOnly,
+    [string]$Python = 'python'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -161,6 +164,7 @@ $report = [ordered]@{
 }
 
 try {
+    if ($BaselineOnly -and $RollbackUiOnly) { throw 'Choose BaselineOnly or RollbackUiOnly, not both.' }
     if (-not $ModuleRoot) { $ModuleRoot = Split-Path -Parent $PSScriptRoot }
     $ModuleRoot = Resolve-FileSystemPath $ModuleRoot
     $sourceProject = Join-Path $ModuleRoot 'project'
@@ -247,6 +251,17 @@ try {
     Copy-Item -LiteralPath $frameworkDirectory -Destination $snapshotFramework -Recurse
     $report.snapshotProject = $snapshot
 
+    if (-not $BaselineOnly) {
+        $stage = 'LINK-001 business code preparation'
+        $prepareArguments = @((Join-Path $ModuleRoot 'tools\prepare_link_build.py'),
+            '--module-root', $ModuleRoot, '--snapshot', $snapshot, '--output', $OutputDirectory,
+            '--java-home', $JavaHome, '--android-sdk', $AndroidSdk, '--apktool', $ApktoolJar,
+            '--build-tools-version', $BuildToolsVersion)
+        if ($RollbackUiOnly) { $prepareArguments += '--rollback-ui-only' }
+        $null = Invoke-BuildTool $Python $prepareArguments (Join-Path $OutputDirectory 'link-prepare.log')
+        $report.linkBuild = Get-Content -LiteralPath (Join-Path $OutputDirectory 'link-build.json') -Raw | ConvertFrom-Json
+    }
+
     $stage = 'Apktool build'
     Write-Host 'Compiling the project snapshot with Apktool (2 workers).'
     $unsignedApk = Join-Path $OutputDirectory 'MVTBOT-unsigned.apk'
@@ -282,6 +297,10 @@ try {
     $report.packageName = $packageMatch.Groups[1].Value
     $report.versionCode = $packageMatch.Groups[2].Value
     $report.versionName = $packageMatch.Groups[3].Value
+    if (-not $BaselineOnly -and ($report.versionCode -ne [string]$report.linkBuild.versionCode -or
+        $report.versionName -ne [string]$report.linkBuild.versionName)) {
+        throw 'The final APK version does not match the prepared combined release.'
+    }
     $report.manifestSummary = @($badging.Text -split '\r?\n' | Where-Object { $_ -match '^(package:|(?:min)?sdkVersion:|targetSdkVersion:|application-label|launchable-activity:|native-code:)' })
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -290,6 +309,12 @@ try {
     $payloadFiles = @()
     foreach ($file in Get-ChildItem -LiteralPath $snapshot -File -Filter '*.dex') {
         $payloadFiles += [pscustomobject]@{ Source = $file.FullName; Entry = $file.Name }
+    }
+    # Patched primary smali is assembled by Apktool, rather than copied as raw DEX.
+    $compiledPrimaryDex = Join-Path $snapshot 'build\apk\classes.dex'
+    if (-not (Test-Path -LiteralPath (Join-Path $snapshot 'classes.dex')) -and
+        (Test-Path -LiteralPath $compiledPrimaryDex -PathType Leaf)) {
+        $payloadFiles += [pscustomobject]@{ Source = $compiledPrimaryDex; Entry = 'classes.dex' }
     }
     if (@($payloadFiles).Count -eq 0) { throw 'No preserved DEX payload was found in the project snapshot.' }
     foreach ($mapping in @(@('assets', 'assets'), @('lib', 'lib'), @('unknown\META-INF\services', 'META-INF/services'))) {
@@ -314,6 +339,21 @@ try {
             $checks += [pscustomobject]@{ entry = $file.Entry; sha256 = $actual; bytesUnchanged = $true }
         }
     } finally { $archive.Dispose() }
+    if (-not $BaselineOnly) {
+        $stage = 'LINK-001 final DEX verification'
+        $verifyArguments = @((Join-Path $ModuleRoot 'tools\verify_link_apk.py'),
+            '--apk', $finalApk, '--module-root', $ModuleRoot, '--snapshot', $snapshot,
+            '--report', (Join-Path $OutputDirectory 'link-dex-verification.json'))
+        if ($RollbackUiOnly) { $verifyArguments += '--rollback-ui-only' }
+        $null = Invoke-BuildTool $Python $verifyArguments (Join-Path $OutputDirectory 'link-dex-verification.log')
+        $report.linkDexVerification = Get-Content -LiteralPath (Join-Path $OutputDirectory 'link-dex-verification.json') -Raw | ConvertFrom-Json
+        $stage = 'Combined UI and whole primary DEX verification'
+        $uiArguments = @((Join-Path $ModuleRoot 'tools\verify_combined_ui.py'),
+            '--apk', $finalApk, '--module-root', $ModuleRoot, '--snapshot', $snapshot,
+            '--output', $OutputDirectory, '--java-home', $JavaHome, '--apktool', $ApktoolJar)
+        $null = Invoke-BuildTool $Python $uiArguments (Join-Path $OutputDirectory 'combined-ui-verification.log')
+        $report.combinedUiVerification = Get-Content -LiteralPath (Join-Path $OutputDirectory 'combined-ui-verification.json') -Raw | ConvertFrom-Json
+    }
     # PNGs may be losslessly re-encoded by AAPT; image pixels are a separate gate.
     $report.payloadChecks = $checks
     $report.alignmentVerified = $true

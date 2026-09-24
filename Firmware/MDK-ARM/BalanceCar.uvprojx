@@ -730,6 +730,11 @@
               <FilePath>..\BSP\bluetooth.c</FilePath>
             </File>
             <File>
+              <FileName>bluetooth_link.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bluetooth_link.c</FilePath>
+            </File>
+            <File>
               <FileName>buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\BSP\buzzer.c</FilePath>

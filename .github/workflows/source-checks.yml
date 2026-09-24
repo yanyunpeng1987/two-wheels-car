@@ -56,13 +56,22 @@ jobs:
             tests/battery_monitor_test.c -o build/tests/battery_monitor_test
           ./build/tests/battery_monitor_test
           python3 tests/battery_adc_test.py --cc gcc --output-dir build/tests/battery-adc
+      - name: Execute HC-05D UART framing and motion protection tests
+        run: python3 tests/run_bluetooth_tests.py --cc gcc
+      - name: Execute Android protocol and BLE state replay
+        run: |
+          python3 Android/MVTBOT/link/tests/run_protocol_tests.py --java-home "$JAVA_HOME"
+          python3 Android/MVTBOT/link/tests/test_ble_session.py --java-home "$JAVA_HOME"
+          python3 Android/MVTBOT/link/tests/test_cross_stack_rearm.py --java-home "$JAVA_HOME" --cc gcc
+          python3 Android/MVTBOT/link/tests/test_dex_roundtrip.py
+          python3 Android/MVTBOT/tools/test_ui_patch.py
       - name: Validate tool syntax and JSON files
         run: |
           python3 - <<'PY'
           import ast
           import json
           from pathlib import Path
-          for path in [*Path('tools').glob('*.py'), *Path('Android/MVTBOT/tools').glob('*.py')]:
+          for path in [*Path('tools').glob('*.py'), *Path('Android/MVTBOT/tools').glob('*.py'), *Path('Android/MVTBOT/link/tests').glob('*.py'), *Path('Android/MVTBOT/changes/LINK-001').glob('*.py')]:
               ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
           paths = [*Path('.vscode').glob('*.json'), *Path('docs').rglob('*.json'), *Path('Android/MVTBOT/baseline').glob('*.json'), Path('BalanceCar.code-workspace')]
           for path in paths:

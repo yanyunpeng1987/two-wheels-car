@@ -1,606 +1,402 @@
-/**
- * @file bluetooth.c
- * @author Wang Ruifan
- * @brief 蓝牙发送与接收解读 
- * @version 0.3
- * @date 2025-01-16
- *
- * @copyright Copyright (c) 2025
- *
- */
-
+/* HC-05D BLE UART bridge. LINK-001/002/003; no AT traffic during operation. */
 #include "bluetooth.h"
+#include "bluetooth_link.h"
 #include "main.h"
 #include "control.h"
-#include <string.h>
 #include "persistent_storage.h"
-#include <stdbool.h> 
+#include <stdio.h>
+#include <string.h>
+#include <limits.h>
 
-// --- 宏定义 ---
-#define BLUETOOTH_DMA_BUFFER_SIZE   128          // 单次DMA接收大小，可以适当增大
-#define RX_RING_BUFFER_SIZE         1024        // 主接收环形缓冲区大小，必须足够大以容纳多个命令
-#define MAX_CMD_LENGTH              128          // 最大命令长度
-#define MAX_RESP_LENGTH             128         // 最大响应长度
+#define BT_RX_SLOTS 8U
+#define BT_TX_TIMEOUT_MS 250U
 
-// --- 静态变量 ---
-static uint32_t last_periodic_update_tick = 0;// 用于周期性任务的时间戳
-
-// DMA相关
-static uint8_t rx_dma_buffers[2][BLUETOOTH_DMA_BUFFER_SIZE]; // DMA双缓冲
-static uint32_t dma_buffer_index = 0;                       // 当前使用的DMA缓冲索引
-
-// 环形缓冲区 (Ring Buffer) 用于中断和主循环解耦
-static uint8_t g_rx_ring_buffer[RX_RING_BUFFER_SIZE];
-static volatile uint16_t g_rx_write_index = 0; // 中断写入位置
-static volatile uint16_t g_rx_read_index = 0;  // 主循环读取位置
-
-// 命令解析相关
-static char cmd_buffer[MAX_CMD_LENGTH] = {0}; // 命令组装缓冲区
-static uint8_t cmd_index = 0;                 // 命令组装缓冲区索引
-
-// 状态标志
-static bool is_reporting_speed = false;
-static bool is_reporting_distance = false;
-static bool is_reporting_acceleration = false;
-
-// 全局变量
-bool enable_bluetooth_output = true; /* 是否输出数据到蓝牙 */
-
-// --- 函数原型 ---
-typedef bool (*CmdHandler)(const char *cmd_args, char *response);
-
-// 命令结构体定义
 typedef struct {
-     char* cmd_type;   // 命令类型
-    CmdHandler handler; // 命令处理函数指针
-} CommandEntry;
+    uint8_t data[BT_WIRE_MAX];
+    uint16_t length;
+    uint32_t cycles;
+    uint32_t epoch;
+} BtRxBlock;
 
-// --- 命令处理函数声明  ---
-static bool handle_pid(const char *cmd_args, char *response);
-static bool handle_middle_angle(const char *cmd_args, char *response);
-static bool handle_balance(const char *cmd_args, char *response);
-static bool handle_speed(const char *cmd_args, char *response);
-static bool handle_turn(const char *cmd_args, char *response);
-static bool handle_report_speed(const char *cmd_args, char *response);
-static bool handle_report_distance(const char *cmd_args, char *response);
-static bool handle_report_acceleration(const char *cmd_args, char *response);
-static bool handle_report_pid(const char *cmd_args, char *response);
-static bool handle_report_voltage(const char *cmd_args, char *response);
-static bool handle_report_init_pid(const char *cmd_args, char *response);
-static bool handle_target_speed(const char *cmd_args, char *response);
-int datw = 0;
-// --- 命令处理表  ---
-static const CommandEntry CMD_TABLE[] = {
-    {"1", handle_middle_angle},
-    {"2", handle_pid},
-    {"3", handle_target_speed},
-    {"4", handle_report_speed},
-    {"5", handle_report_distance},
-    {"6", handle_report_acceleration},
-		{"7", handle_report_voltage},
-		{"8", handle_report_pid},
-    {0,  NULL} // 表结束标志
-};
+static uint8_t rx_dma_buffers[2][BT_WIRE_MAX];
+static volatile uint8_t rx_dma_index;
+static volatile uint32_t rx_dma_epoch;
+static BtRxBlock rx_blocks[BT_RX_SLOTS];
+static volatile uint32_t rx_write;
+static volatile uint32_t rx_read;
+static volatile uint8_t rx_recovery;
+static volatile uint8_t rx_paused;
+static uint8_t callbacks_ready;
+static BtParser parser;
+static volatile BtMotionGuard motion;
+static BtTxQueue tx_queue;
+static volatile uint8_t tx_done;
+static uint8_t tx_started;
+static uint8_t tx_pending;
+static uint32_t tx_started_cycles;
+static uint32_t last_periodic_cycles;
+static uint8_t reporting[BT_TELEMETRY_SLOTS];
 
-// 在文件顶部或函数外部定义新的状态
-typedef enum {
-    STATE_IDLE,                 // 等待 'C'
-    STATE_GOT_C,                // 已收到 'C', 等待 'M'
-    STATE_GOT_M,                // 已收到 'CM', 等待 'D'
-    STATE_RECEIVING_PAYLOAD     // 已收到 "CMD", 正在接收数据
-} ParserState;
+bool enable_bluetooth_output = true;
+int datw;
+volatile BluetoothLinkStats bluetooth_link_stats;
+/* Retain the existing diagnostic ABI; these are not part of the wire format. */
+volatile LogMessage g_log_ring_buffer[LOG_BUFFER_COUNT];
+volatile uint16_t g_log_write_index;
+volatile uint16_t g_log_read_index;
 
-
-volatile LogMessage g_log_ring_buffer[LOG_BUFFER_COUNT]; 
-volatile uint16_t g_log_write_index = 0;                 
-volatile uint16_t g_log_read_index = 0;                 
-
-static char g_bt_tx_buffer[MAX_RESP_LENGTH];
-
-
-// 定义一个静态变量来保存当前状态
-static ParserState parser_state = STATE_IDLE;
-
-// --- 内部辅助函数 ---
-static void process_command(const char* command);
-
-/******************************************************************************************/
-/*                            初始化与中断处理                               */
-/******************************************************************************************/
-
-/**
- * @brief 蓝牙初始化
- */
-void bluetooth_init(void)
+static uint32_t lock_interrupts(void)
 {
-    // 注册接收事件回调
-    HAL_UART_RegisterRxEventCallback(&huart6, bluetooth_dma_rx_callback);
-    // 开始DMA接收
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_dma_buffers[dma_buffer_index], BLUETOOTH_DMA_BUFFER_SIZE);
+    uint32_t previous = __get_PRIMASK();
+    __disable_irq();
+    return previous;
 }
 
-/**
- * @brief 蓝牙DMA接收事件回调函数 
- * @brief  快速将DMA收到的数据存入环形缓冲区，然后立即退出。
- * @param huart UART句柄
- * @param Size 接收到的数据长度
- */
-void bluetooth_dma_rx_callback(UART_HandleTypeDef *huart, uint16_t Size)
+static void receive_fault(void)
 {
-    if (huart->Instance == USART6) 
-    {
-        uint32_t current_dma_idx = dma_buffer_index;
-        dma_buffer_index = (dma_buffer_index + 1) % 2; // 切换DMA缓冲
-			
-        // 立即重新启动下一次DMA接收，确保通信不间断
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_dma_buffers[dma_buffer_index], BLUETOOTH_DMA_BUFFER_SIZE);
+    uint32_t previous = lock_interrupts();
+    rx_recovery = 1U;
+    bt_guard_invalidate(&motion);
+    __set_PRIMASK(previous);
+}
 
-        // 将数据从DMA缓冲区快速转移到环形缓冲区
-        for (uint16_t i = 0; i < Size; i++)
-        {
-            uint16_t next_write_idx = (g_rx_write_index + 1) % RX_RING_BUFFER_SIZE;
-            if (next_write_idx != g_rx_read_index) // 检查环形缓冲区是否已满
-            {
-                g_rx_ring_buffer[g_rx_write_index] = rx_dma_buffers[current_dma_idx][i];
-                g_rx_write_index = next_write_idx;
-            }
-            else
-            {
-                break;
-            }
-        }
+static uint8_t start_receive(uint8_t index)
+{
+    uint32_t previous = lock_interrupts();
+    uint32_t epoch = motion.epoch;
+    /* Capture the epoch at DMA arm, so old partial bytes cannot re-arm motion. */
+    if (HAL_UARTEx_ReceiveToIdle_DMA(&huart6, rx_dma_buffers[index], BT_WIRE_MAX) != HAL_OK) {
+        ++bluetooth_link_stats.rx_restart_errors;
+        receive_fault();
+        __set_PRIMASK(previous);
+        return 0U;
     }
+    __HAL_DMA_DISABLE_IT(huart6.hdmarx, DMA_IT_HT);
+    rx_dma_index = index;
+    rx_dma_epoch = epoch;
+    __set_PRIMASK(previous);
+    return 1U;
 }
 
-/**
- * @brief 主循环任务函数
- * @brief 从环形缓冲区中取出数据，组装成完整指令并处理。
- * @note  此函数必须在 main 函数的 while(1) 循环中被持续调用。
- */
-
-void bluetooth_main_loop_task(void)
+static void synchronize_receive_epoch(void)
 {
-    while (g_rx_read_index != g_rx_write_index)
-    {
-        char data = g_rx_ring_buffer[g_rx_read_index];
-        g_rx_read_index = (g_rx_read_index + 1) % RX_RING_BUFFER_SIZE;
-
-        switch (parser_state)
-        {
-            case STATE_IDLE:
-                if (data == 'C') {
-                    // 找到了帧头的第一个字符
-                    cmd_index = 0; // 重置缓冲区索引
-                    cmd_buffer[cmd_index++] = 'C';
-                    parser_state = STATE_GOT_C; // 切换到下一个状态
-                }
-                // 如果不是'C'，则忽略该字节，状态保持不变
-                break;
-
-            case STATE_GOT_C:
-                if (data == 'M') {
-                    // 匹配成功，继续
-                    cmd_buffer[cmd_index++] = 'M';
-                    parser_state = STATE_GOT_M;
-                } else {
-                    // 匹配失败 (例如收到 "CX")，回到初始状态
-                    parser_state = STATE_IDLE;
-                    // 特殊情况：如果失败的字符是'C' (例如收到 "CC")，
-                    // 我们可以直接开始新的匹配
-                    if (data == 'C') {
-                        cmd_index = 0;
-                        cmd_buffer[cmd_index++] = 'C';
-                        parser_state = STATE_GOT_C;
-                    }
-                }
-                break;
-
-            case STATE_GOT_M:
-                if (data == 'D') {
-                    // 帧头 "CMD" 完整匹配！
-                    cmd_buffer[cmd_index++] = 'D';
-                    parser_state = STATE_RECEIVING_PAYLOAD;
-                } else {
-                    // 匹配失败 (例如收到 "CMX")，回到初始状态
-                    parser_state = STATE_IDLE;
-                    // 同样，检查失败的字符是否为'C'
-                    if (data == 'C') {
-                        cmd_index = 0;
-                        cmd_buffer[cmd_index++] = 'C';
-                        parser_state = STATE_GOT_C;
-                    }
-                }
-                break;
-
-            case STATE_RECEIVING_PAYLOAD:
-                if (data == '$') {
-                    // 找到了帧尾，一条完整的指令接收完毕
-                    cmd_buffer[cmd_index] = '\0'; // 添加字符串结束符
-                    
-                    // 注意：此时 cmd_buffer 中已经是 "CMD|1|-15.2"
-                    // process_command 函数无需任何改动！
-                    process_command(cmd_buffer);
-
-                    // 重置所有状态，准备接收下一条指令
-                    cmd_index = 0;
-                    memset(cmd_buffer, 0, sizeof(cmd_buffer));
-                    parser_state = STATE_IDLE;
-                } else {
-                    // 将数据存入缓冲区
-                    if (cmd_index < sizeof(cmd_buffer) - 1) {
-                        cmd_buffer[cmd_index++] = data;
-                    } else {
-                        // 缓冲区溢出，指令过长，视为非法指令
-                        // 丢弃所有数据，回到初始状态
-                        cmd_index = 0;
-                        parser_state = STATE_IDLE;
-                    }
-                }
-                break;
-        } 
-    } 
-}
-
-/******************************************************************************************/
-/*                                 命令解析与执行                                        */
-/******************************************************************************************/
-
-/**
- * @brief 内部函数：处理一条完整的命令字符串
- * @param command 接收到的完整命令 (不包含结束符)
- */
-static void process_command(const char* command)
-{
-
-       // 1. 基本检查和前缀验证
-    if (command == NULL || strncmp(command, "CMD|", 4) != 0) {
-        // 如果 command 为空 或 不是以 "CMD|" 开头，则为无效指令
+    uint32_t previous = lock_interrupts();
+    if (parser.length != 0U && parser.epoch != motion.epoch) bt_parser_reset(&parser);
+    if (rx_recovery != 0U || rx_dma_epoch == motion.epoch) {
+        __set_PRIMASK(previous);
         return;
     }
-
-    bool cmd_handled = false;
-    char response[MAX_RESP_LENGTH] = {0};
-
-  // 2. 分离功能码和参数
-    const char *body = command + 4; 
-    
-    //    查找参数分隔符 '|'
-    const char *args_separator = strchr(body, '|');
-    
-    char function_code[16]; // 分配足够空间存储功能码
-    const char *cmd_args;   // 指向正确的参数部分的指针
-
-    if (args_separator != NULL) {
-        size_t code_len = args_separator - body;
-        if (code_len == 0 || code_len >= sizeof(function_code)) {
-            return; // 功能码为空或太长，视为无效
-        }
-        
-        strncpy(function_code, body, code_len);
-        function_code[code_len] = '\0'; // 确保字符串结尾
-        
-        // 参数部分从 '|' 开始, cmd_args 指向 "|100|200"
-        cmd_args = args_separator;
-    } else {
-        size_t code_len = strlen(body);
-        if (code_len == 0 || code_len >= sizeof(function_code)) {
-            return; // 功能码为空或太长
-        }
-        strcpy(function_code, body);
-        cmd_args = ""; 
+    /* Main-loop only: discard an old DMA arm during silence, without touching TX.
+       Already queued blocks retain their epochs and are filtered individually. */
+    rx_paused = 1U;
+    __set_PRIMASK(previous);
+    if (HAL_UART_AbortReceive(&huart6) != HAL_OK) {
+        ++bluetooth_link_stats.rx_restart_errors;
+        receive_fault();
     }
-
-    // 3. 查表并分发
-    for (int i = 0; CMD_TABLE[i].handler != NULL; i++) {
-        // 使用 strcmp 比较字符串内容
-        if (strcmp(function_code, CMD_TABLE[i].cmd_type) == 0) {
-            // 找到了匹配的功能码
-            char response[MAX_RESP_LENGTH] = {0};
-            
-            // 调用对应的 handler，并传递正确的参数
-            CMD_TABLE[i].handler(cmd_args, response);
-            
-            // 命令已处理，退出函数
-            return; 
-        }
-    }
-
+    previous = lock_interrupts();
+    if (rx_recovery == 0U) (void)start_receive(0U);
+    rx_paused = 0U;
+    __set_PRIMASK(previous);
 }
 
+static uint8_t register_callbacks(void)
+{
+    if (callbacks_ready != 0U) return 1U;
+    if (HAL_UART_RegisterRxEventCallback(&huart6, bluetooth_dma_rx_callback) != HAL_OK ||
+        HAL_UART_RegisterCallback(&huart6, HAL_UART_TX_COMPLETE_CB_ID,
+                                  bluetooth_tx_complete_callback) != HAL_OK) {
+        ++bluetooth_link_stats.rx_restart_errors;
+        receive_fault();
+        return 0U;
+    }
+    callbacks_ready = 1U;
+    return 1U;
+}
 
-/******************************************************************************************/
-/*                                 数据发送与周期性任务                                   */
-/******************************************************************************************/
+void bluetooth_init(void)
+{
+    memset((void *)&bluetooth_link_stats, 0, sizeof(bluetooth_link_stats));
+    memset(reporting, 0, sizeof(reporting));
+    bt_parser_reset(&parser);
+    bt_tx_init(&tx_queue);
+    bt_guard_init(&motion, SystemCoreClock / 1000U,
+                  (uint8_t)(running_mode == Normal_Mode));
+    rx_write = rx_read = 0U;
+    rx_recovery = tx_done = tx_started = tx_pending = 0U;
+    rx_paused = 0U;
+    callbacks_ready = 0U;
+    last_periodic_cycles = DWT->CYCCNT;
+    if (!register_callbacks()) return;
+    (void)start_receive(0U);
+}
 
-/**
- * @brief 蓝牙发送数据
- * @param data 要发送的数据
- * @param size 数据大小
- */
+void bluetooth_dma_rx_callback(UART_HandleTypeDef *huart, uint16_t size)
+{
+    uint8_t completed;
+    uint32_t epoch, received_cycles;
+    HAL_UART_RxEventTypeTypeDef event;
+    BtRxBlock *block;
+    if (huart->Instance != USART6) return;
+    event = HAL_UARTEx_GetRxEventType(huart);
+    if (event == HAL_UART_RXEVENT_HT) return;
+    if (rx_recovery != 0U || rx_paused != 0U) return;
+    if ((event != HAL_UART_RXEVENT_IDLE && event != HAL_UART_RXEVENT_TC) ||
+        size == 0U || size > BT_WIRE_MAX) {
+        ++bluetooth_link_stats.rx_errors;
+        receive_fault();
+        return;
+    }
+    completed = rx_dma_index;
+    epoch = rx_dma_epoch;
+    received_cycles = DWT->CYCCNT;
+    if (!start_receive((uint8_t)(completed ^ 1U))) return;
+    if ((uint32_t)(rx_write - rx_read) >= BT_RX_SLOTS) {
+        ++bluetooth_link_stats.rx_overflows;
+        receive_fault();
+        return;
+    }
+    block = &rx_blocks[rx_write % BT_RX_SLOTS];
+    memcpy(block->data, rx_dma_buffers[completed], size);
+    block->length = size;
+    block->cycles = received_cycles;
+    block->epoch = epoch;
+    __DMB();
+    ++rx_write;
+}
+
+void bluetooth_uart_error_callback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART6) {
+        ++bluetooth_link_stats.rx_errors;
+        receive_fault();
+    }
+}
+
+void bluetooth_tx_complete_callback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART6) tx_done = 1U;
+}
+
+/* Called in the control ISR after all mode selection, before velocity/turn. */
+void bluetooth_control_update(uint8_t normal_mode)
+{
+    /* Publish one coherent snapshot even if UART IRQ priority changes later. */
+    uint32_t previous = lock_interrupts();
+    bt_guard_tick(&motion, DWT->CYCCNT, normal_mode);
+    blue_front = (uint8_t)(motion.speed > 0);
+    blue_back = (uint8_t)(motion.speed < 0);
+    blue_right = (uint8_t)(motion.turn > 0);
+    blue_left = (uint8_t)(motion.turn < 0);
+    __set_PRIMASK(previous);
+}
+
+static uint8_t submit_frame(uint8_t channel, const char *data, int length)
+{
+    if (!enable_bluetooth_output || length <= 0 || length > (int)BT_WIRE_MAX) return 0U;
+    return bt_tx_submit(&tx_queue, channel, (const uint8_t *)data, (uint16_t)length);
+}
 
 void bluetooth_send_data(const uint8_t *data, uint16_t size)
 {
-    if (enable_bluetooth_output && data != NULL && size > 0)
-    {        
-        uint32_t tickstart = HAL_GetTick();
-        while ((huart6.gState & HAL_UART_STATE_BUSY_TX) == HAL_UART_STATE_BUSY_TX)
-        {
-            if ((HAL_GetTick() - tickstart) > 100)
-            {
-                HAL_UART_AbortTransmit(&huart6);
-                return;
-            }
-        }
-
-        if(HAL_UART_Transmit_DMA(&huart6, (uint8_t*)data, size) != HAL_OK)
-        {
-        }
-    }
+    if (enable_bluetooth_output) (void)bt_tx_submit(&tx_queue, 0U, data, size);
 }
 
-
-/**
- * @brief 蓝牙命令的响应消息发送
- * @param response 响应消息的字符串
- * @return true 字符串数据有效且发送成功
- * @return false 字符串数据无效或发送失败
- */
 bool send_response(const char *response)
 {
-    if (response != NULL && response[0] > 0)
-    {
-        uint8_t msg_len = (uint8_t)response[0];
-        if (msg_len > 0)
+    /* Legacy internal length prefix; send neither the prefix nor trailing NUL. */
+    if (response == NULL || !enable_bluetooth_output) return false;
+    return bt_tx_submit(&tx_queue, 0U, (const uint8_t *)&response[1],
+                        (uint8_t)response[0]) != 0U;
+}
+
+static void service_transmit(void)
+{
+    const BtTxFrame *frame;
+    uint32_t now = DWT->CYCCNT;
+    if (tx_done != 0U) {
+        tx_done = 0U;
+        tx_started = tx_pending = 0U;
+        bt_tx_complete(&tx_queue);
+    }
+    if (tx_pending != 0U &&
+        (uint32_t)(now - tx_started_cycles) >= (SystemCoreClock / 1000U) * BT_TX_TIMEOUT_MS) {
+        (void)HAL_UART_AbortTransmit(&huart6);
+        ++bluetooth_link_stats.tx_errors;
+        tx_done = tx_started = tx_pending = 0U;
+        bt_tx_complete(&tx_queue);
+    }
+    if (tx_started != 0U || !enable_bluetooth_output) return;
+    frame = bt_tx_begin(&tx_queue);
+    if (frame == NULL) return;
+    if (tx_pending == 0U) {
+        tx_started_cycles = now;
+        tx_pending = 1U;
+    }
+    if (HAL_UART_Transmit_DMA(&huart6, (uint8_t *)frame->data, frame->length) == HAL_OK) {
+        tx_started = 1U;
+    }
+}
+
+static void process_command(uint32_t last_cycles)
+{
+    BtCommand command;
+    char response[BT_WIRE_MAX + 1U];
+    int length = 0;
+    uint32_t previous;
+    if (!bt_decode_command(parser.data, &command)) {
+        ++bluetooth_link_stats.invalid_frames;
+        return;
+    }
+    previous = lock_interrupts();
+    bt_guard_tick(&motion, DWT->CYCCNT, (uint8_t)(running_mode == Normal_Mode));
+    if (parser.epoch != motion.epoch || rx_recovery != 0U ||
+        (uint32_t)(DWT->CYCCNT - parser.first_cycles) >= motion.timeout_cycles) {
+        __set_PRIMASK(previous);
+        ++bluetooth_link_stats.stale_frames;
+        return;
+    }
+    if (command.code == 3U) {
+        /* The neutral transition cannot be overwritten by a following command. */
+        (void)bt_guard_receive(&motion, command.args[0], command.args[1],
+                               parser.first_cycles, last_cycles, parser.epoch, DWT->CYCCNT);
+        __set_PRIMASK(previous);
+        return;
+    }
+    __set_PRIMASK(previous);
+    switch (command.code) {
+    case 1:
+        previous = lock_interrupts();
+        pidparams.middle_angle = command.decimal;
+        modify = 1;
+        __set_PRIMASK(previous);
+        break;
+    case 2:
+        previous = lock_interrupts();
+        if (command.args[0] == 1) {
+            pidparams.balance_kp = command.args[1];
+            pidparams.balance_kd = command.args[2];
+        } else if (command.args[0] == 2) {
+            pidparams.velocity_kp = command.args[1];
+            pidparams.velocity_ki = command.args[2];
+        } else {
+            pidparams.turn_kp = command.args[1];
+            pidparams.turn_kd = command.args[2];
+        }
+        modify = 1;
+        __set_PRIMASK(previous);
+        break;
+    case 4: case 5: case 6:
+        reporting[command.code - 4U] = (uint8_t)command.args[0];
+        if (command.args[0] == 0) tx_queue.telemetry[command.code - 4U].length = 0U;
+        break;
+    case 7:
         {
-            bluetooth_send_data((const uint8_t*)&response[1], msg_len);
-            return true;
+            /* Snapshot the ISR-visible value before checking and conversion. */
+            float local_voltage = voltage;
+            if (local_voltage >= 0.0f && local_voltage < 1000000.0f)
+                length = snprintf(response, sizeof(response), "CMD|7|%d|$", (int)(local_voltage * 1000.0f));
+        }
+        break;
+    case 8:
+        {
+            PID_Params snapshot;
+            previous = lock_interrupts();
+            if (command.args[0] == 2) {
+                pidparams.middle_angle = -4.0f;
+                pidparams.balance_kp = 140;
+                pidparams.balance_kd = 450;
+                pidparams.velocity_kp = 30;
+                pidparams.velocity_ki = 80;
+                pidparams.turn_kp = 5;
+                pidparams.turn_kd = 500;
+                /* Preserve the previous reset command's non-persistent behavior. */
+            }
+            snapshot = pidparams;
+            __set_PRIMASK(previous);
+            length = snprintf(response, sizeof(response), "CMD|8|%.1f|%d|%d|%d|%d|%d|%d|$",
+                              snapshot.middle_angle, snapshot.balance_kp, snapshot.velocity_kp,
+                              snapshot.turn_kp, snapshot.balance_kd, snapshot.velocity_ki, snapshot.turn_kd);
+        }
+        break;
+    default: break;
+    }
+    if (length > 0) (void)submit_frame(0U, response, length);
+}
+
+void bluetooth_main_loop_task(void)
+{
+    BtRxBlock block;
+    uint32_t previous;
+    unsigned int budget = BT_RX_SLOTS;
+    if (rx_recovery != 0U) {
+        /* Error callbacks only latch faults. Abort/re-arm remains outside ISR. */
+        (void)HAL_UART_AbortReceive(&huart6);
+        (void)HAL_UART_AbortTransmit(&huart6);
+        previous = lock_interrupts();
+        rx_read = rx_write;
+        rx_recovery = 0U;
+        tx_done = tx_started = tx_pending = 0U;
+        __set_PRIMASK(previous);
+        bt_parser_reset(&parser);
+        bt_tx_init(&tx_queue);
+        if (register_callbacks()) (void)start_receive(0U);
+    }
+    synchronize_receive_epoch();
+    while (budget-- != 0U && rx_recovery == 0U) {
+        unsigned int i;
+        previous = lock_interrupts();
+        if (rx_read == rx_write) {
+            __set_PRIMASK(previous);
+            break;
+        }
+        block = rx_blocks[rx_read % BT_RX_SLOTS];
+        ++rx_read;
+        if (block.epoch != motion.epoch) {
+            __set_PRIMASK(previous);
+            continue;
+        }
+        __set_PRIMASK(previous);
+        for (i = 0U; i < block.length; ++i) {
+            if (bt_parser_feed(&parser, block.data[i], block.cycles,
+                                block.epoch, motion.timeout_cycles)) {
+                process_command(block.cycles);
+            }
         }
     }
-    return false;
+    service_transmit();
 }
 
-/**
- * @brief 周期性处理需要持续发送的蓝牙数据
- * @note  此函数应在主循环中以固定频率调用
- */
 void bluetooth_periodic_update(void)
 {
-	  if (HAL_GetTick() - last_periodic_update_tick >= 100) // 发送周期为100ms
-    {
-      // 更新时间戳，为下一次计时做准备
-      last_periodic_update_tick = HAL_GetTick();
-			
-			// 为避免浮点数在不同上下文中值被改变，在函数开始时就拷贝
-			int local_velocity_right = velocity_right;
-			int local_velocity_left = velocity_left;
-			int local_dis = dis;
-			float local_accel_y = acceleration_y;
-			float local_gyro_z = gyro_turn;
-		
-			// 检查是否需要报告控制参数
-			if (is_reporting_speed)
-			{
-					snprintf(&g_bt_tx_buffer[1], sizeof(g_bt_tx_buffer) - 2, "CMD|4|%d|%d|$", local_velocity_right, local_velocity_left);
-					g_bt_tx_buffer[0] = strlen(&g_bt_tx_buffer[1]);
-					send_response(g_bt_tx_buffer);
-					HAL_Delay(10);
-			}
-			if (is_reporting_distance)
-			{
-					snprintf(&g_bt_tx_buffer[1], sizeof(g_bt_tx_buffer) - 2, "CMD|5|%d|$",  local_dis);
-					g_bt_tx_buffer[0] = strlen(&g_bt_tx_buffer[1]);
-					send_response(g_bt_tx_buffer);
-					HAL_Delay(10);
-			}
-
-			if (is_reporting_acceleration)
-			{
-					snprintf(&g_bt_tx_buffer[1], sizeof(g_bt_tx_buffer) - 2, "CMD|6|%.1f|%.1f|$", local_accel_y, local_gyro_z);
-					g_bt_tx_buffer[0] = strlen(&g_bt_tx_buffer[1]);
-					send_response(g_bt_tx_buffer);
-					HAL_Delay(10);
-			}
-		}
-}
-
-
-static bool handle_middle_angle(const char *cmd_args, char *response)
-{
-	float value;
-	if (sscanf(cmd_args + 1, "%f", &value) == 1)
-	{
-		pidparams.middle_angle = value ; // 设置中点角度
-	  modify = 1;
-
-	}
-	return false; 
-}
-
-static bool handle_pid(const char *cmd_args, char *response)
-{
-		int sub_command;
-		int param1, param2;
-		if (sscanf(cmd_args, "|%d", &sub_command) != 1) {
-        return false;
+    uint32_t now = DWT->CYCCNT;
+    uint32_t previous;
+    float right, left, accel, gyro;
+    uint16_t distance_value;
+    char response[BT_WIRE_MAX + 1U];
+    int length;
+    if ((uint32_t)(now - last_periodic_cycles) < SystemCoreClock / 10U) return;
+    last_periodic_cycles = now;
+    previous = lock_interrupts();
+    right = velocity_right;
+    left = velocity_left;
+    distance_value = dis;
+    accel = acceleration_y;
+    gyro = gyro_turn;
+    __set_PRIMASK(previous);
+    if (reporting[0] != 0U && right >= (float)INT_MIN && right < (float)INT_MAX &&
+        left >= (float)INT_MIN && left < (float)INT_MAX) {
+        length = snprintf(response, sizeof(response), "CMD|4|%d|%d|$", (int)right, (int)left);
+        (void)submit_frame(1U, response, length);
     }
-	
-    int items_scanned = sscanf(cmd_args, "|%d|%d|%d", &sub_command, &param1, &param2);
-
-    if (items_scanned != 3) {
-        return false;
+    if (reporting[1] != 0U) {
+        length = snprintf(response, sizeof(response), "CMD|5|%d|$", (int)distance_value);
+        (void)submit_frame(2U, response, length);
     }
-
-    switch (sub_command)
-    {
-        case 1:
-            pidparams.balance_kp = param1;
-            pidparams.balance_kd = param2;
-						modify = 1;
-            break;
-				
-        case 2:
-            pidparams.velocity_kp = param1;
-            pidparams.velocity_ki = param2;
-						modify = 1;
-            break;
-
-        case 3:
-            pidparams.turn_kp = param1;
-            pidparams.turn_kd = param2;
-						modify = 1;
-            break;
-       
-        default:
-            break;
+    if (reporting[2] != 0U && accel == accel && gyro == gyro &&
+        accel <= 1.0e30f && accel >= -1.0e30f && gyro <= 1.0e30f && gyro >= -1.0e30f) {
+        length = snprintf(response, sizeof(response), "CMD|6|%.1f|%.1f|$", accel, gyro);
+        (void)submit_frame(3U, response, length);
     }
-		return false;
-	}
-
-
-static bool handle_balance(const char *cmd_args, char *response)
-{
-	int kp_val, kd_val;
-	int items_scanned = sscanf(cmd_args, "|%d|%d", &kp_val, &kd_val);
-	if (items_scanned == 2){
-		pidparams.balance_kp = kp_val;
-		pidparams.balance_kd = kd_val;
-	}
-	return false;
-}
-
-
-static bool handle_speed(const char *cmd_args, char *response)
-{
-	int kp_val, ki_val;
-	int items_scanned = sscanf(cmd_args, "|%d|%d", &kp_val, &ki_val);
-	if (items_scanned == 2){
-		pidparams.velocity_kp = kp_val;
-		pidparams.velocity_ki = ki_val;
-	}
-	return false;
-}
-
-
-static bool handle_turn(const char *cmd_args, char *response)
-{
-	int kp_val, kd_val;
-	int items_scanned = sscanf(cmd_args, "|%d|%d", &kp_val, &kd_val);
-	if (items_scanned == 2){
-		pidparams.turn_kp = kp_val;
-		pidparams.turn_kd = kd_val;
-	}
-	return false;
-}
-
-
-static bool handle_report_speed(const char *cmd_args, char *response)
-{
-    int int_value;
-    if (sscanf(cmd_args + 1, "%d", &int_value) == 1)
-    {
-        is_reporting_speed = (int_value == 1);
-    }
-    return false;
-}
-
-static bool handle_report_distance(const char *cmd_args, char *response)
-{
-    int int_value;
-    if (sscanf(cmd_args+ 1, "%d", &int_value) == 1)
-    {
-        is_reporting_distance = (int_value == 1);
-    }
-    return false;
-}
-
-
-static bool handle_report_acceleration(const char *cmd_args, char *response)
-{
-    int int_value;
-    if (sscanf(cmd_args+ 1, "%d", &int_value) == 1)
-    {
-        is_reporting_acceleration = (int_value == 1);
-    }
-    return false;
-}
-
-
-static bool handle_report_voltage(const char *cmd_args, char *response)
-{
-		int local_voltage = voltage * 1000;
-
-    snprintf(&g_bt_tx_buffer[1], MAX_RESP_LENGTH - 2, "CMD|7|%d|$",
-             (int)local_voltage);
-    g_bt_tx_buffer[0] = strlen(&g_bt_tx_buffer[1]);
-		send_response(g_bt_tx_buffer);
-		HAL_Delay(10);
-    return true; 
-}
-
-static bool handle_report_pid(const char *cmd_args, char *response)
-{
-    int sub_command = 1; // 默认为 1 
-
-    // 1. 解析子命令
-    if (cmd_args != NULL) {
-        sscanf(cmd_args, "|%d", &sub_command);
-    }
-
-    // 2. 根据子命令决定是否重置PID值
-    if (sub_command == 2) {
-        // 子命令为 2，执行重置操作
-        pidparams.middle_angle = -4.0f; 
-        pidparams.balance_kp = 140;
-        pidparams.balance_kd = 450;
-        pidparams.velocity_kp = 30;
-        pidparams.velocity_ki = 80;
-        pidparams.turn_kp = 5;
-        pidparams.turn_kd = 500;
-    }
-
-    // 3. 无论是否重置，都执行报告操作
-    snprintf(&g_bt_tx_buffer[1], MAX_RESP_LENGTH - 2, "CMD|8|%.1f|%d|%d|%d|%d|%d|%d|$",
-            pidparams.middle_angle,
-             (int)pidparams.balance_kp,
-             (int)pidparams.velocity_kp,
-             (int)pidparams.turn_kp,
-						 (int)pidparams.balance_kd,
-						 (int)pidparams.velocity_ki,
-             (int)pidparams.turn_kd);
-    
-    // 4. 发送响应
-    g_bt_tx_buffer[0] = strlen(&g_bt_tx_buffer[1]);
-    send_response(g_bt_tx_buffer);
-
-    return true; // 表示命令成功处理并已发送响应
-}
-
-static bool handle_target_speed(const char *cmd_args, char *response)
-{
-	int speed_val, turn_val;
-	int items_scanned = sscanf(cmd_args, "|%d|%d", &speed_val, &turn_val);
-	
-	if (items_scanned == 2){
-		if (speed_val > 0){
-			blue_back = 0;
-			blue_front = 1;
-		} else if(speed_val < 0){
-			blue_front = 0;
-			blue_back = 1;
-		} else {
-			blue_front = 0;
-			blue_back = 0;
-		}
-	if (turn_val > 0){
-			blue_left = 0;
-			blue_right = 1;
-		} else if(turn_val < 0){
-			blue_right = 0;
-			blue_left = 1;
-		} else {
-			blue_right = 0;
-			blue_left = 0;
-		}
-	}
-	return false;
+    service_transmit();
 }

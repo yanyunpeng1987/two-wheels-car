@@ -110,3 +110,7 @@ USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [�
 MVTBOT 的 APK、重建输入、原始拆分包、反编译参考、蓝牙闪退原始日志和 Android 环境记录已归入 [Android/MVTBOT](Android/MVTBOT/README.md)。项目级入口见 [APP 开发资料索引](docs/ANDROID_MVTBOT.md)。
 
 当前 APP 基线为 v21（2.3.6-mvtbot.2，MVTBOT 图标版）；蓝牙 NUL 解析闪退仍待结合设备端日志分析，未因资料合并而修复。设备端继续编辑 Firmware/；APP 的本地重建和签名脚本不执行手机安装或固件下载。原始包、派生工程与证据按现有仓库约定本地保存，文档和脚本可统一管理。
+
+## HC-05D BLE 兼容开发
+
+独立兼容版本支持 HC-05D 的 E0FF 和原模块 FFE0，新增完整帧容错、DMA收发保护及100ms/500ms遥控失联契约。配置、构建、回退和实物验收见 [HC-05D兼容说明](docs/HC05D_COMPATIBILITY.md)，主机/构建证据见 [测试报告](docs/HC05D_TEST_REPORT.md)。新固件应与新APP配套使用；本地通过不代表已经安装、烧录或整车验收。

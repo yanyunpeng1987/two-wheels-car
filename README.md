@@ -7,9 +7,11 @@ GitHub：[yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunp
 新电脑先克隆仓库并安装下文所列工具：
 
 ```powershell
-git clone https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle.git
-cd two-wheel-balancing-vehicle
+git clone https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle.git Two-wheels-Car
+cd Two-wheels-Car
 ```
+
+`Two-wheels-Car` 是本地目录名，GitHub 仓库仍为 `two-wheel-balancing-vehicle`。目录改名不改变远程地址、分支、标签或 Pull Request；已保存的编辑器和 Codex 项目入口需重新选择新路径。
 
 仓库包含构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，新克隆也不需要它。
 
@@ -19,7 +21,7 @@ cd two-wheel-balancing-vehicle
 
 双击根目录 `Open-Keil.cmd`，打开新工程 `Firmware/MDK-ARM/BalanceCar.uvprojx`，选择 `BalanceCar`，按 **F7** 编译。首次建议执行 **Project → Rebuild all target files**。
 
-当前项目目录开头有不可见字符，直接双击 `.uvprojx` 可能使旧版 Keil 读文件失败。打开脚本使用 Windows 已有的 8.3 短路径；它和 VS Code 操作的是同一份文件。移动到普通英文路径后也可直接打开 `.uvprojx`。
+本地工程已迁移到纯英文目录 `Two-wheels-Car`，可直接打开 `.uvprojx`。建议后续克隆也使用上面的目录名，避免复制粘贴带入不可见字符。`Open-Keil.cmd` 与 VS Code 仍操作同一份工程；脚本保留对旧 Unicode 路径的 8.3 短路径兼容处理。
 
 ### VS Code
 
@@ -68,7 +70,11 @@ python tools/verify_project.py --artifacts
 | `docs/DEVELOPMENT_LOG.md` | 开发过程、验证证据和用户反馈 |
 | `docs/KNOWN_ISSUES.md` | 延后排查事项与独立待核查隐患 |
 
-开发和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段版本见 [CHANGELOG.md](CHANGELOG.md)，第三方来源见 [授权文件索引](docs/THIRD_PARTY_NOTICES.md)。GitHub Actions 只做源码静态检查，Keil 完整编译在已安装工具链的 Windows 上执行。
+开发和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，阶段版本见 [CHANGELOG.md](CHANGELOG.md)，第三方来源见 [授权文件索引](docs/THIRD_PARTY_NOTICES.md)。GitHub Actions 执行源码检查和手柄 C 回归测试，Keil 完整编译在已安装工具链的 Windows 上执行。
+
+USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
+
+`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。新增的纯 C 报文解析模块已加入 Keil 工程，当前编译输入为 74 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
 
 后续修改 `Firmware/`。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 

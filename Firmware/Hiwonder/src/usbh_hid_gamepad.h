@@ -1,48 +1,29 @@
-
 #ifndef __USBH_HID_GAMEPAD_H
 #define __USBH_HID_GAMEPAD_H
+
+#include "usbh_hid.h"
+#include "gamepad_report.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Includes ------------------------------------------------------------------*/
-#include "usbh_hid.h"
-#include <stdbool.h>
+#define GAMEPAD_USB_RX_BYTES 64U
 
-typedef struct {
-    uint16_t buttons;
-		uint8_t hat;
-    int8_t lx;
-    int8_t ly;
-    int8_t rx;
-    int8_t ry;
-} HID_GAMEPAD_Info_TypeDef;
 extern HID_GAMEPAD_Info_TypeDef *info;
+/* Read-only debugger observations; no logging in the control interrupt. */
+extern volatile uint16_t gamepad_raw_buttons;
+extern volatile uint32_t gamepad_reports_accepted;
+extern volatile uint32_t gamepad_reports_rejected;
 
-
+uint8_t USBH_HID_GamepadIs20BC(const USBH_HandleTypeDef *phost);
 USBH_StatusTypeDef USBH_HID_GamepadInit(USBH_HandleTypeDef *phost);
+void USBH_HID_GamepadReset(void);
+void USBH_HID_GamepadReceive(USBH_HandleTypeDef *phost, uint32_t length);
 HID_GAMEPAD_Info_TypeDef *USBH_HID_GetGamepadInfo(USBH_HandleTypeDef *phost);
-
-#define GAMEPAD_BUTTON_MASK_L2        0x0001u
-#define GAMEPAD_BUTTON_MASK_R2        0x0002u
-#define GAMEPAD_BUTTON_MASK_SELECT    0x0004u
-#define GAMEPAD_BUTTON_MASK_START     0x0008u
-#define GAMEPAD_BUTTON_MASK_L3        0x0020u
-#define GAMEPAD_BUTTON_MASK_R3        0x0040u
-#define GAMEPAD_BUTTON_MASK_CROSS     0x0100u
-#define GAMEPAD_BUTTON_MASK_CIRCLE    0x0200u
-#define GAMEPAD_BUTTON_MASK_SQUARE    0x0800u
-#define GAMEPAD_BUTTON_MASK_TRIANGLE  0x1000u
-#define GAMEPAD_BUTTON_MASK_L1        0x4000u
-#define GAMEPAD_BUTTON_MASK_R1        0x8000u
-
-
-#define GAMEPAD_GET_BUTTON(gi, km) (((gi)->buttons & km) ? true : false)
-
 
 #ifdef __cplusplus
 }
 #endif
-
 #endif /* __USBH_HID_GAMEPAD_H */

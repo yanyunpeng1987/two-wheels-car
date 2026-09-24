@@ -693,8 +693,8 @@ void gamepad_scan(void) {
         gamepad_speed = 0.0f;
         gamepad_turn = 0.0f;
     }
-	last_buttons = info->buttons;
-	last_buttons_state = info->buttons;
+	last_buttons = (info != NULL) ? info->buttons : 0U;
+	last_buttons_state = last_buttons;
 }
 		
     

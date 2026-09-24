@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-17T12:32:04.752366+00:00",
+  "target": {
+    "vid": "0x20BC",
+    "pid": "0x5500",
+    "bcdDevice": "0x1003"
+  },
+  "usb_configuration": {
+    "total_length": 84,
+    "ep0_max_packet": 64,
+    "interface_count": 3,
+    "interfaces": [
+      {
+        "number": 0,
+        "alternate": 0,
+        "endpoint_count": 1,
+        "class": 3,
+        "subclass": 0,
+        "protocol": 0,
+        "endpoints": [
+          {
+            "address": "0x81",
+            "attributes": 3,
+            "max_packet_size": 64,
+            "interval_ms": 10
+          }
+        ],
+        "hid_report_descriptor_length": 123
+      },
+      {
+        "number": 1,
+        "alternate": 0,
+        "endpoint_count": 1,
+        "class": 3,
+        "subclass": 0,
+        "protocol": 0,
+        "endpoints": [
+          {
+            "address": "0x82",
+            "attributes": 3,
+            "max_packet_size": 64,
+            "interval_ms": 10
+          }
+        ],
+        "hid_report_descriptor_length": 123
+      },
+      {
+        "number": 2,
+        "alternate": 0,
+        "endpoint_count": 1,
+        "class": 3,
+        "subclass": 0,
+        "protocol": 0,
+        "endpoints": [
+          {
+            "address": "0x83",
+            "attributes": 3,
+            "max_packet_size": 64,
+            "interval_ms": 10
+          }
+        ],
+        "hid_report_descriptor_length": 101
+      }
+    ]
+  },
+  "observed_gamepad_collection_count": 2,
+  "gamepad_collections": [
+    {
+      "usb_interface_number": 0,
+      "top_level_usage_page": "0x0001",
+      "top_level_usage": "0x0005",
+      "windows_input_report_bytes": 10,
+      "windows_output_report_bytes": 5,
+      "windows_feature_report_bytes": 0,
+      "input_report_ids": [
+        0
+      ],
+      "usb_has_report_id": false,
+      "usb_input_report_bytes": 9,
+      "sample_windows_hex": "00 00 00 0F 80 80 80 80 00 00",
+      "sample_usb_payload_hex": "00 00 0F 80 80 80 80 00 00",
+      "sample_pressed_button_usages": [],
+      "button_fields": {
+        "usage_page": "0x0009",
+        "usage_min": 1,
+        "usage_max": 15,
+        "usb_first_bit": 0,
+        "bit_size_per_button": 1,
+        "byte_order": "little-endian"
+      },
+      "value_fields": [
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0039",
+          "usb_byte_offset": 2,
+          "lsb": 0,
+          "bit_size": 4,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 7,
+          "has_null": true,
+          "sample_raw_value": 15
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0030",
+          "usb_byte_offset": 3,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0031",
+          "usb_byte_offset": 4,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0032",
+          "usb_byte_offset": 5,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0035",
+          "usb_byte_offset": 6,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0002",
+          "usage": "0x00C5",
+          "usb_byte_offset": 7,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 0
+        },
+        {
+          "usage_page": "0x0002",
+          "usage": "0x00C4",
+          "usb_byte_offset": 8,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 0
+        }
+      ]
+    },
+    {
+      "usb_interface_number": 1,
+      "top_level_usage_page": "0x0001",
+      "top_level_usage": "0x0005",
+      "windows_input_report_bytes": 10,
+      "windows_output_report_bytes": 5,
+      "windows_feature_report_bytes": 0,
+      "input_report_ids": [
+        0
+      ],
+      "usb_has_report_id": false,
+      "usb_input_report_bytes": 9,
+      "sample_windows_hex": "00 00 00 0F 80 80 80 80 00 00",
+      "sample_usb_payload_hex": "00 00 0F 80 80 80 80 00 00",
+      "sample_pressed_button_usages": [],
+      "button_fields": {
+        "usage_page": "0x0009",
+        "usage_min": 1,
+        "usage_max": 15,
+        "usb_first_bit": 0,
+        "bit_size_per_button": 1,
+        "byte_order": "little-endian"
+      },
+      "value_fields": [
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0039",
+          "usb_byte_offset": 2,
+          "lsb": 0,
+          "bit_size": 4,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 7,
+          "has_null": true,
+          "sample_raw_value": 15
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0030",
+          "usb_byte_offset": 3,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0031",
+          "usb_byte_offset": 4,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0032",
+          "usb_byte_offset": 5,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0001",
+          "usage": "0x0035",
+          "usb_byte_offset": 6,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 128
+        },
+        {
+          "usage_page": "0x0002",
+          "usage": "0x00C5",
+          "usb_byte_offset": 7,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 0
+        },
+        {
+          "usage_page": "0x0002",
+          "usage": "0x00C4",
+          "usb_byte_offset": 8,
+          "lsb": 0,
+          "bit_size": 8,
+          "report_count": 1,
+          "logical_min": 0,
+          "logical_max": 255,
+          "has_null": false,
+          "sample_raw_value": 0
+        }
+      ]
+    }
+  ],
+  "method": {
+    "configuration": "Read USB device/configuration descriptors",
+    "hid_caps": "HidD_GetAttributes/GetPreparsedData and HidP_GetCaps/GetValueCaps/GetButtonCaps",
+    "sample": "One ReadFile input sample from each of the two UsagePage 1 / Usage 5 gamepad collections",
+    "field_offsets": "HidP_GetUsageValue/GetUsages on saved input and synthetic single-bit buffers in memory; synthetic reports were not sent to the device",
+    "windows_prefix": "ReportID 0 is the Windows API placeholder; remove the first zero before interpreting USB payload offsets"
+  },
+  "scope": {
+    "hid_output_or_feature_write": false,
+    "keyboard_input_read": false,
+    "interface_2_input_read": false,
+    "physical_axis_mapping_verified": false,
+    "physical_button_mapping_verified": false,
+    "radio_disconnect_behavior_verified": false,
+    "stm32_transport_verified": false,
+    "raw_hid_report_descriptor_bytes_saved": false
+  },
+  "source_sha256": {
+    "usb_configuration.json": "5350db11820d14040023110785b8c2a99928fa30acafa690ce54d89251f6e9eb",
+    "hid-capabilities.json": "af6bc38c2ce59a2cf1ed2b0a8116a585304ee847b05c4a92509bf328bd8341a5",
+    "hid-layout.json": "68fb136077b88c3ab224440fa7688628bcbb57d5a2d24371aa9bc139d7d6c7fe"
+  }
+}

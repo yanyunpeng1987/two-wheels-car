@@ -27,7 +27,7 @@ git status --short
 
 `--baseline` 专用于原始导入复核，需要完整本地 `MiniBalan/` 包；新克隆和日常修改不使用该选项。编译器、设备包要求见 README。
 
-GitHub Actions 运行源码引用与内存布局的静态检查、工具语法检查。托管 runner 未安装 Keil 及其许可，因此 **CI 通过不等于 Keil 编译通过，更不等于硬件验收通过**。PR 中记录实际本地编译和硬件验证范围。
+GitHub Actions 运行源码引用与内存布局的静态检查、工具语法检查，并用 GCC 执行实际手柄解析模块及 USB 适配层的 C 回归测试，命令见 `tests/README.md`。托管 runner 未安装 Keil 及其许可，因此 **CI 通过不等于 Keil 编译通过，更不等于硬件验收通过**。PR 中记录实际本地编译和硬件验证范围。
 
 ## 提交与记录
 

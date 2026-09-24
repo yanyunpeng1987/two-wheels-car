@@ -102,7 +102,8 @@ void MX_GPIO_Init(void)
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+  /* main enables control only after all peripherals and PID are ready. */
+  HAL_NVIC_DisableIRQ(EXTI2_IRQn);
 
 }
 

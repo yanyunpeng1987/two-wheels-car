@@ -80,7 +80,7 @@ python tools/verify_project.py --artifacts
 
 USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
 
-`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。新增的纯 C 报文解析模块已加入 Keil 工程，当前编译输入为 74 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
+`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。纯 C 报文解析、保护/停机诊断及电池监测模块均已加入 Keil 工程，当前编译输入为 77 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
 
 设备端后续修改 `Firmware/`；APP 从 `Android/MVTBOT/` 开始。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 
@@ -104,3 +104,9 @@ USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [�
 构建调用遵循 [Keil µVision 命令行文档](https://www.keil.com/support/man/docs/uv4cl/uv4cl_commandline.htm)，代码提示配置依据 [VS Code C/C++ 配置文档](https://code.visualstudio.com/docs/cpp/customize-cpp-settings)。工程配置以本地 `.uvprojx` 和实际构建结果为准。
 
 导入文件保留原有版权声明，HAL、CMSIS、USB 中间件的授权文件随源码保留。当前参考资料没有覆盖整个项目的统一授权文件，因此没有给整包重新声明统一开源许可证。
+
+## Android APP 与设备端协同开发
+
+MVTBOT 的 APK、重建输入、原始拆分包、反编译参考、蓝牙闪退原始日志和 Android 环境记录已归入 [Android/MVTBOT](Android/MVTBOT/README.md)。项目级入口见 [APP 开发资料索引](docs/ANDROID_MVTBOT.md)。
+
+当前 APP 基线为 v21（2.3.6-mvtbot.2，MVTBOT 图标版）；蓝牙 NUL 解析闪退仍待结合设备端日志分析，未因资料合并而修复。设备端继续编辑 Firmware/；APP 的本地重建和签名脚本不执行手机安装或固件下载。原始包、派生工程与证据按现有仓库约定本地保存，文档和脚本可统一管理。

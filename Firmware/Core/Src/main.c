@@ -81,7 +81,7 @@ int motor_left;
 int motor_right;
 
 int temperature;   // 温度
-float voltage;       // 电压
+volatile float voltage; // Latest successful raw battery voltage (V).
 float angle;
 float gyro;
 
@@ -162,16 +162,43 @@ void MX_USB_HOST_Process(void);
   * @brief  The application entry point.
   * @retval int
   */
+/* Keep Flash reads read-only even when started after a debugger session. */
+static uint8_t startup_flash_read_only(void)
+{
+    if (HAL_FLASH_Unlock() != HAL_OK) {
+        return 0U;
+    }
+    CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
+    if (HAL_FLASH_Lock() != HAL_OK) {
+        return 0U;
+    }
+    return (FLASH->CR & (FLASH_CR_PG | FLASH_CR_LOCK)) == FLASH_CR_LOCK;
+}
+
+/* Run only after all callback dependencies and PID parameters are ready. */
+static void startup_enable_control(void)
+{
+    flag_move = 0U;
+    set_pwm(0, 0);
+    (void)read_encoder(2);
+    (void)read_encoder(3);
+    __HAL_GPIO_EXTI_CLEAR_IT(IMU_INT2_Pin);
+    HAL_NVIC_ClearPendingIRQ(EXTI2_IRQn);
+    /* A latched-high DRDY may not provide a new rising edge after init. */
+    if (HAL_GPIO_ReadPin(IMU_INT2_GPIO_Port, IMU_INT2_Pin) == GPIO_PIN_SET) {
+        __HAL_GPIO_EXTI_GENERATE_SWIT(IMU_INT2_Pin);
+    }
+    HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+}
+
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  if(HAL_FLASH_Unlock() == HAL_OK) {
-		CLEAR_BIT(FLASH->CR,  FLASH_CR_PSIZE);
-		FLASH->CR |= FLASH_PSIZE_WORD;
-		FLASH->CR |= FLASH_CR_PG;
-		HAL_FLASH_Lock();
-	}
+  HAL_NVIC_DisableIRQ(EXTI2_IRQn);
+  if (startup_flash_read_only() == 0U) {
+      Error_Handler();
+  }
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -179,7 +206,7 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */ 
 
   /* USER CODE END Init */
 
@@ -207,14 +234,16 @@ int main(void)
 	MX_I2C3_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  qmi8658_app_init(&hspi3, IMU_CS_GPIO_Port, IMU_CS_Pin);
+  if (qmi8658_app_init(&hspi3, IMU_CS_GPIO_Port, IMU_CS_Pin) != IMU_OK) {
+      Error_Handler();
+  }
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_CHANNEL_COUNT);
+    /* ADC1 has no DMA handle; battery and CCD use polling conversions. */
 	// 初始化蜂鸣器
 	buzzers_init();
 	HAL_Delay(500);
@@ -247,6 +276,8 @@ int main(void)
 			// 将默认值写入Flash，以便下次启动时使用
 			Write_PID_To_Flash(&pidparams); 
 	}
+  handle_low_voltage_alarm(); // Seed raw voltage before the control IRQ starts.
+  startup_enable_control();
   /* USER CODE END 2 */
 
   /* Infinite loop */

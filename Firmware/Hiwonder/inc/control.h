@@ -5,6 +5,8 @@
 #include "tim.h"
 #include "ultrasound.h"
 #include "ccd.h"
+#include "control_stop_trace.h"
+#include "battery_monitor.h"
 
 extern int Sensor_Left,Sensor_Middle,Sensor_Right,Sensor;
 
@@ -73,6 +75,9 @@ void select_middle_angle(void);
 uint8_t select_running_mode(void);
 void gamepad_scan(void);
 void handle_low_voltage_alarm(void);
+uint8_t control_stop_snapshot(ControlStopSample *sample);
+extern volatile ControlStopTrace control_stop_trace;
+extern BatteryMonitor battery_monitor;
 
 extern uint8_t rgb_left[3];
 extern uint8_t rgb_right[3];

@@ -176,39 +176,51 @@ uint16_t Get_ADC_Value(uint32_t Channel)
 int get_battery_volt(void)
 {
     ADC_ChannelConfTypeDef sConfig = {0};
-    uint16_t adc_raw_value = 0;
+    uint32_t started_cycles;
+    const uint32_t timeout_cycles = SystemCoreClock / 1000U;
+    uint32_t adc_raw_value;
+    int voltage_cv = -1;
 
-    // 2. 配置ADC通道为电池电压通道 (ADC_CHANNEL_4)
+    /* Main-loop only: serialize battery and CCD access to ADC1. */
+    if (HAL_ADC_Stop(&hadc1) != HAL_OK) {
+        return -1;
+    }
     sConfig.Channel = ADC_CHANNEL_4;
     sConfig.Rank = 1;
-    // 电池电压变化很慢，可以使用较长的采样时间以获得更准确、更稳定的结果
     sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-    {
-      // 配置失败，返回一个错误值
-      return -1;
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+        goto restore_ccd;
+    }
+    if (HAL_ADC_Start(&hadc1) != HAL_OK) {
+        goto restore_ccd;
     }
 
-    // 3. 启动一次单次转换
-    HAL_ADC_Start(&hadc1);
-
-    // 4. 等待转换完成，并读取结果
-    if (HAL_ADC_PollForConversion(&hadc1, 100) == HAL_OK)
-    {
-        adc_raw_value = HAL_ADC_GetValue(&hadc1);
+    /* A completed conversion wins even if the control ISR preempted us. */
+    started_cycles = DWT->CYCCNT;
+    while (__HAL_ADC_GET_FLAG(&hadc1, ADC_FLAG_EOC) == RESET) {
+        if ((uint32_t)(DWT->CYCCNT - started_cycles) >= timeout_cycles) {
+            goto restore_ccd;
+        }
     }
-    
-    // 5. 将ADC通道配置切回默认的CCD通道
-    //    这确保了下一次 ccd_read_data() 调用时ADC处于正确的状态。
+    /* EOC is already set: use HAL only to complete its software state. */
+    if (HAL_ADC_PollForConversion(&hadc1, 0U) != HAL_OK) {
+        goto restore_ccd;
+    }
+    adc_raw_value = HAL_ADC_GetValue(&hadc1);
+    if (adc_raw_value <= 4095U) {
+        voltage_cv = (int)(adc_raw_value * 3.3f * 11.0f * 100.0f / 4096.0f);
+    }
+
+restore_ccd:
+    if (HAL_ADC_Stop(&hadc1) != HAL_OK) {
+        voltage_cv = -1;
+    }
     sConfig.Channel = ADC_CHANNEL_10;
-    sConfig.Rank = 1;
-    sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES; // 恢复CCD的高速采样时间
-    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
-
-    // 6. 根据原始值计算实际电压
-    const int volt = (int)(adc_raw_value * 3.3f * 11.0f * 100.0f / 4096.0f);
-    
-    return volt;
+    sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+        voltage_cv = -1;
+    }
+    return voltage_cv;
 }
 
 /* USER CODE END 1 */

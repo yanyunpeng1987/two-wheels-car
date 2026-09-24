@@ -9,7 +9,7 @@
 | GitHub | 私有 `yanyunpeng1987/two-wheel-balancing-vehicle` | 本次使用已授权 Git 凭据查询 API 确认；默认分支 `main` |
 | `main` / `v0.1.0` | `499b420` | 初始 73 输入源码基线，不代表 APP/整车发布 |
 | 设备功能分支 | `codex/relax-gamepad-model-filter` / `82f3b45` | 74 输入；[PR #1](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/1) 草稿，2026-09-24 Actions 成功；原/新手柄待实测 |
-| 本次管理分支 | `codex/apk-firmware-management` | 从 `82f3b45` 建立的独立工作区；APP 资料入口、脚本、基线清单及协作规则；不包含其他任务的未提交设备修改 |
+| 本次管理分支 | `codex/apk-firmware-management` / `2eca87f` 管理实现 | [PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2) 草稿；从 `82f3b45` 建立独立工作区；[源码与 Android CI](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829) 通过；不包含其他任务的未提交设备修改 |
 | 当前主工作区 | 电机极性 + T1 诊断 + T2 启动修复 | 整理时为 76 输入、未提交，独立设备任务持续验证；本表不是其最新下载状态来源 |
 
 管理 PR 基于 PR #1 的分支审查。PR #1 合入后再将管理 PR 的 base 调整到 `main`，重新确认差异和 CI。保持草稿，避免把未验收硬件功能随管理文档自动发布。

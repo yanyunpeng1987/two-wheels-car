@@ -155,3 +155,5 @@ GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，o
 只读复核 Android 导入17,711文件/332,529,270字节全部匹配；可提交project基线1,445文件/42,437,889字节匹配。默认Android管理检查、固件源码引用/Flash布局检查、VS Code同步检查通过。现有v21签名重建是前一任务的历史证据，本次没有重新打包、安装、连接手机或烧录。当前发布与验收边界见RELEASE_MATRIX.md。
 
 回退可revert本次管理提交；原始材料与设备固件未被重排或删除。GitHub源码并不包含恢复APK所需全部本地输入，备份须另外保留。
+
+管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。

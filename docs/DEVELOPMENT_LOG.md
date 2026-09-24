@@ -95,6 +95,44 @@ HEX SHA-256：`8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`
 
 本次没有烧录，原手柄回归、新手柄在 STM32 接口 `0` 的控制验证、逐键标定和整车验收均未完成。复测步骤见 [手柄兼容说明](GAMEPAD_COMPATIBILITY.md)。
 
+## 2026-09-24 — ST-Link Utility 路径兼容问题与目录改名准备
+
+用户确认：将此前的 HEX 原样复制到桌面纯英文目录后，STM32 ST-Link Utility 可以正常打开并烧录。因此该现象与原路径兼容性有关，不能归因于 HEX 损坏或地址越界。原目录名称的第一个字符为不可见的 `U+200C`（ZERO WIDTH NON-JOINER）；其来源无法追溯，复制粘贴是可能来源之一。没有单独复现 ST-Link Utility 内部的字符编码转换，不把具体实现机制写成已确认事实。
+
+用户要求同级改名为 `Two-wheels-Car`。检查确认 Keil、VS Code、启动入口与构建脚本均使用相对路径或基于自身位置定位，无需修改工程配置。Windows 当前拒绝目录改名；只读检查发现当前 Codex 会话持有旧目录的监视/辅助进程句柄，目录及父目录 ACL 正常，新名称没有冲突。未强制退出 Codex，也未创建第二套工程。
+
+**当时状态：目录尚未改名；完成结果见本日下方的“目录改名完成与关联同步”。** 已在项目目录外的桌面 `BalanceCar_Firmware` 文件夹准备 `Rename-Two-wheels-Car.cmd` 与同名 PowerShell 脚本。正常退出 Codex 后运行 CMD 即可再次尝试改名；脚本拒绝覆盖或合并已有目标目录，改名后检查 HEX、main.c、Keil 工程文件哈希一致，再执行 IntelliSense、工程产物和 Keil 环境检查。成功标志为新目录中的 `build/path-rename-completed.json`。重新打开项目时使用新路径；Codex 保存的旧项目路径也需重新选择。
+
+本次脚本语法和 CheckOnly 预检通过，74 个活动输入、HEX/AXF/MAP 校验、VS Code 配置及 Arm Compiler 6.16 / DFP 2.17.1 环境检查均通过。改动文档前，396 个已跟踪文件与改名前快照逐项哈希一致，保留了用户 main.c 原有修改。HEX SHA-256 仍为 `8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`。没有重编译、烧录或操作目标硬件；用户确认烧录成功也不代表新旧手柄功能已经验收。
+
+## 2026-09-24 — 修复目录改名脚本的工作目录占用与错误记录
+
+用户执行第一版改名脚本后仍失败，返回的是脚本统一替换后的提示，因此不能据此确定当时的 Windows 原始错误。进一步在 Windows PowerShell 5.1 临时目录复现：从待改名目录启动，仅 `Set-Location` 到父目录会保留进程原生当前目录，导致 `0x80070020` 共享占用；同时设置 `[Environment]::CurrentDirectory` 后改名成功。第一版仅做 CheckOnly 预检，未覆盖这一真实改名路径，验证不足。
+
+已更新桌面 `BalanceCar_Firmware` 内同名 PS1/CMD：CMD 先 `cd /d "%~dp0"`，PS1 同时切换逻辑目录和原生工作目录；保留原始错误文字/HResult，保存脚本外部 transcript，失败时只读列出工程的打开句柄；哈希改用明确释放文件流的 .NET SHA-256，并显式创建完成报告目录。本次另观察到资源管理器打开了工程 `Firmware/build/keil` 目录，以及当前 Codex 的目录监视句柄，故真实改名前也需关闭指向工程的资源管理器窗口。打开句柄列表不等于每个句柄均阻止改名，不能笼统把所有列出的进程认定为根因。
+
+修复版完成独立端到端验证：分别从临时工程旧目录内部启动 CMD 和直接启动 PowerShell，两条路径均真正完成改名且退出码为 0；396 个已跟踪文件及 HEX/AXF/MAP 逐文件 SHA-256 一致；VS Code 配置、74 个活动输入、固件产物和 Keil 环境检查通过；完成报告和 transcript 均生成。临时验证仅替换脚本的父目录常量，未操作真实工程或硬件。
+
+该次排查结束时，真实项目仍位于原目录，尚未完成改名；需退出占用它的开发会话后运行桌面更新后的同名 CMD。新的失败记录为桌面 `BalanceCar_Firmware/Rename-Two-wheels-Car-*.log`，不再仅依赖统一错误提示。main.c 与 HEX 内容未修改，HEX SHA-256 保持 `8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`。
+
+## 2026-09-24 — 依据真实失败日志解除 Explorer 子目录占用
+
+用户再次执行修复版失败。实际 `Rename-Two-wheels-Car-20260924-114156-471.log` 显示：根目录 DELETE 访问探针通过，项目句柄仅来自 explorer.exe PID 10588，两个句柄均指向 `Firmware/build/keil`；该次没有 Codex 或 PowerShell 的项目句柄。因此不能继续把这次失败归因于已修复的脚本工作目录问题。
+
+检查时资源管理器显示的是桌面 `BalanceCar_Firmware`，但左侧快速访问仍有 `keil` 条目。通过正常关闭该资源管理器窗口后，再次枚举确认两个 Explorer 句柄消失。重新打开资源管理器运行桌面脚本存在再次引入工程引用的风险；本次改用独立一次性助手，在当前 Codex 正常退出后运行已经验证的改名脚本，避免用户再次打开资源管理器启动脚本。
+
+一次性助手位于桌面 `BalanceCar_Firmware/Finish-Two-wheels-Car.ps1`，等待最长 15 分钟，退出后最多尝试 12 次；不结束用户应用、不创建计划任务、不开机自启。通过独立进程启动的 CheckOnly 实际通过，VS Code、74 个活动输入、HEX/AXF/MAP 和 Keil 环境检查成功。状态记录为同文件夹 `Finish-Two-wheels-Car-rename.json`；当时仍等待退出后执行；后续已取得新目录 `build/path-rename-completed.json`，完成结果见下节。
+
+## 2026-09-24 — 目录改名完成与关联同步
+
+用户确认改名成功。独立助手状态为 success，真实项目完成报告时间为 **11:58:08**，目标为 `Two-wheels-Car`，旧目录已不存在；助手进程已退出。改名过程保留 HEX、main.c 与 Keil 工程文件内容一致。本次未新增固件修改，main.c 原有用户尾空格改动保留在工作区，不纳入文档提交。
+
+已检查 Git、Keil、VS Code、启动脚本和 GitHub Actions：活动配置均无旧工作区绝对路径硬编码，使用相对路径或按脚本位置解析；无需重建仓库或修改源码。README 的克隆命令显式使用 `Two-wheels-Car` 作为本地目录，更新基线路径说明、CHANGELOG，并关闭 KI-003。上方“尚未改名”记录描述的是当时状态，不能作为当前状态使用。
+
+GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，origin、分支和 `v0.1.0` 标签保留。文档改动沿用 `codex/relax-gamepad-model-filter` 分支并关联现有 [PR #1](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/1)；PR 保持草稿，未自动合并。Codex 项目列表仍显示旧目录入口，需要在应用内重新关联 `Two-wheels-Car`；本任务后续命令已显式使用新目录。
+
+新目录实际执行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -Action Rebuild`，日志 `Firmware/build/keil/rebuild-20260924-120923-c0a8af3a.log`，结果 **0 Error(s), 0 Warning(s)**。Code 84,748、RO 7,492、RW 104、ZI 28,048 字节；`python tools/verify_project.py --artifacts` 和 `python tools/sync_vscode.py --check` 通过。HEX 加载数据 92,348 字节、RAM 28,152 字节，PID 参数区无 HEX 数据。重新构建后的 HEX SHA-256 仍为 `8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`，与迁移前完全一致。本次没有烧录或操作目标硬件。
+
 ## 后续记录模板
 
 复制以下条目并按日期追加；只填写实际完成和实际观察到的内容。

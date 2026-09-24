@@ -84,11 +84,13 @@ python tools/sync_vscode.py --check
 python tools/verify_project.py --baseline --artifacts
 ```
 
-## 当前路径兼容处理
+## 路径兼容处理与后续迁移
 
-工作区目录名称以不可见 Unicode 字符开头。本机 µVision 5.36 从该长路径运行时返回 15 且不产生日志；从 Windows 已有的 8.3 别名运行成功。构建和打开脚本通过 `GetShortPathNameW` 自动选择现有短路径，没有更改目录名称、创建盘符映射或修改系统设置。
+初始化时，工作区目录名称以不可见 Unicode 字符开头。本机 µVision 5.36 从该长路径运行时返回 15 且不产生日志；从 Windows 已有的 8.3 别名运行成功。构建和打开脚本通过 `GetShortPathNameW` 自动选择现有短路径，没有更改目录名称、创建盘符映射或修改系统设置。
 
 若迁移到其他电脑/分区，没有可用的 ASCII 短路径，脚本会明确报错。将整个工作区复制到普通英文路径即可解决；仍需保留相对目录结构。推荐通过根目录 `Open-Keil.cmd` 或 VS Code 的 `Keil: Open IDE` 打开工程。
+
+2026-09-24 已将本机工程目录改为 `Two-wheels-Car`。新路径直接通过 Keil 完整重编译，0 错误、0 警告；HEX SHA-256 与改名前一致。以上 Unicode/8.3 描述保留为初始化阶段的历史依据。GitHub 仓库地址及 `v0.1.0` 标签未因本地目录改名而改变；最新克隆命令见根目录 README。
 
 ## 验证边界与回退
 

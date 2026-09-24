@@ -7,9 +7,11 @@ GitHub：[yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunp
 新电脑先克隆仓库并安装下文所列工具：
 
 ```powershell
-git clone https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle.git
-cd two-wheel-balancing-vehicle
+git clone https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle.git Two-wheels-Car
+cd Two-wheels-Car
 ```
+
+`Two-wheels-Car` 是本地目录名，GitHub 仓库仍为 `two-wheel-balancing-vehicle`。目录改名不改变远程地址、分支、标签或 Pull Request；已保存的编辑器和 Codex 项目入口需重新选择新路径。
 
 仓库包含构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，新克隆也不需要它。
 
@@ -19,7 +21,7 @@ cd two-wheel-balancing-vehicle
 
 双击根目录 `Open-Keil.cmd`，打开新工程 `Firmware/MDK-ARM/BalanceCar.uvprojx`，选择 `BalanceCar`，按 **F7** 编译。首次建议执行 **Project → Rebuild all target files**。
 
-当前项目目录开头有不可见字符，直接双击 `.uvprojx` 可能使旧版 Keil 读文件失败。打开脚本使用 Windows 已有的 8.3 短路径；它和 VS Code 操作的是同一份文件。移动到普通英文路径后也可直接打开 `.uvprojx`。
+本地工程已迁移到纯英文目录 `Two-wheels-Car`，可直接打开 `.uvprojx`。建议后续克隆也使用上面的目录名，避免复制粘贴带入不可见字符。`Open-Keil.cmd` 与 VS Code 仍操作同一份工程；脚本保留对旧 Unicode 路径的 8.3 短路径兼容处理。
 
 ### VS Code
 

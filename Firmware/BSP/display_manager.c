@@ -102,8 +102,22 @@ static const char* get_mode_name(running_mode_t mode)
 /**
  * @brief 更新主屏幕显示
  */
+static const char *stop_reason_name(uint8_t reason)
+{
+    switch (reason) {
+    case CONTROL_STOP_ACC: return "ACC";
+    case CONTROL_STOP_SPD: return "SPD";
+    case CONTROL_STOP_KEY: return "KEY";
+    case CONTROL_STOP_ANG: return "ANG";
+    case CONTROL_STOP_UNKNOWN: return "UNK";
+    default: return "MIX";
+    }
+}
+
 static void display_manager_update_main_screen(void)
 {
+    static ControlStopSample stop;
+    uint8_t stopped = control_stop_snapshot(&stop);
 
 		int enable = 0;
 		if (mode == running_mode){
@@ -111,13 +125,30 @@ static void display_manager_update_main_screen(void)
 		}else {
 			enable = 0;}
 	  // 第一行：电机启停
-    snprintf(display_buffer, sizeof(display_buffer), "Flag_move: %d", flag_move);
+    snprintf(display_buffer, sizeof(display_buffer), "Flag_move:%d T4", flag_move);
     lcd_display_string(0, LCD_LEFT, LCD_CYAN, LCD_BLACK, 0, display_buffer);
 	
 	  // 第二行：运行模式
 		const char *mode_name = get_mode_name((running_mode_t)mode);
     snprintf(display_buffer, sizeof(display_buffer), "Mode: %s",mode_name);
     lcd_display_string(1, LCD_LEFT, LCD_CYAN, LCD_BLACK, 0, display_buffer);
+
+    if (stopped != 0U) {
+        /* Frozen evidence, retained even if put_down() automatically rearms. */
+        snprintf(display_buffer, sizeof(display_buffer), "Stop:%s A:%.1f",
+                 stop_reason_name(stop.reason_mask), stop.angle);
+        lcd_display_string(2, LCD_LEFT, LCD_YELLOW, LCD_BLACK, 0, display_buffer);
+        snprintf(display_buffer, sizeof(display_buffer), "Z:%.2f dt:%.1f",
+                 stop.accel_z, (double)stop.interval_cycles * 1000.0 / SystemCoreClock);
+        lcd_display_string(3, LCD_LEFT, LCD_YELLOW, LCD_BLACK, 0, display_buffer);
+        snprintf(display_buffer, sizeof(display_buffer), "L@stop:%.2f", stop.velocity_left);
+        lcd_display_string(4, LCD_LEFT, LCD_WHITE, LCD_BLACK, 0, display_buffer);
+        snprintf(display_buffer, sizeof(display_buffer), "R@stop:%.2f", stop.velocity_right);
+        lcd_display_string(5, LCD_LEFT, LCD_WHITE, LCD_BLACK, 0, display_buffer);
+        snprintf(display_buffer, sizeof(display_buffer), "V@stop:%.1f", stop.voltage);
+        lcd_display_string(6, LCD_LEFT, LCD_GREEN, LCD_BLACK, 0, display_buffer);
+        return;
+    }
 	
     // 第三行：倾斜角度
     snprintf(display_buffer, sizeof(display_buffer), "Angle: %.1f", angle_balance); 
@@ -136,7 +167,13 @@ static void display_manager_update_main_screen(void)
     lcd_display_string(5, LCD_LEFT, LCD_WHITE, LCD_BLACK, 0, display_buffer);
 
     // 第七行：电池电量
-		snprintf(display_buffer, sizeof(display_buffer), "Voltage: %.1f V", voltage);
+    if (battery_monitor.ready != 0U && battery_monitor.stale == 0U) {
+        snprintf(display_buffer, sizeof(display_buffer), "Voltage:%.1fV%s",
+                 (double)battery_monitor.filtered_cv / 100.0,
+                 battery_monitor.low_active != 0U ? " LOW" : "");
+    } else {
+        snprintf(display_buffer, sizeof(display_buffer), "Voltage: --");
+    }
     lcd_display_string(6, LCD_LEFT, LCD_GREEN, LCD_BLACK, 0, display_buffer);
 }
 

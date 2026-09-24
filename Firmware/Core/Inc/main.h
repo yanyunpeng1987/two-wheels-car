@@ -49,7 +49,7 @@ extern int motor_left;
 extern int motor_right;
 
 extern int temperature;    // 温度
-extern float voltage;        // 电压
+extern volatile float voltage;        // 电压
 
 
 extern float middle_angle;   // 平衡角度中值
@@ -179,13 +179,14 @@ void Error_Handler(void);
 #define IMU_INT2_EXTI_IRQn EXTI2_IRQn
 #define CCD_SI_Pin GPIO_PIN_3
 #define CCD_SI_GPIO_Port GPIOB
-#define M2_F_Pin GPIO_PIN_6
+/* Swap each motor output pair for the replacement motor polarity. */
+#define M2_F_Pin GPIO_PIN_7
 #define M2_F_GPIO_Port GPIOB
-#define M2_B_Pin GPIO_PIN_7
+#define M2_B_Pin GPIO_PIN_6
 #define M2_B_GPIO_Port GPIOB
-#define M1_F_Pin GPIO_PIN_8
+#define M1_F_Pin GPIO_PIN_9
 #define M1_F_GPIO_Port GPIOB
-#define M1_B_Pin GPIO_PIN_9
+#define M1_B_Pin GPIO_PIN_8
 #define M1_B_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */

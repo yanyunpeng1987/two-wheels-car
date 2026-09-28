@@ -37,7 +37,7 @@
 | 11:58:55.172 | 已验证profile下写回调13，按该模块策略处理；没有相应新的MCU回包 |
 | 11:58:56.500 | APP打印`health voltage stale for 2500ms`，随后cancelOpen/close/unregister |
 
-这次已直接确认APP的健康截止触发了关闭，但遥测先于关闭停止；不能把它直接称为“数据持续到达时的误判”。该时段是否与用户电源、复位或接线操作重合，已向用户核对，尚待回答。它也不能替代11:30/11:31两次事件的应用日志。证据为同一目录下 `latest-timeout-context.txt`、`app-after-mcu-poweron.raw` 和 `mcu/identity-summary.json`、`mcu/runtime-summary.json`。
+这次已直接确认APP的健康截止触发了关闭，但遥测先于关闭停止；不能把它直接称为“数据持续到达时的误判”。用户后续答复不确定该时段是否操作过电源、复位或接线，会在后续留意记录。因此本次标为“操作背景不确定”，不作为自然断连或APP误判的确认依据，也不能替代11:30/11:31两次事件的应用日志。证据为同一目录下 `latest-timeout-context.txt`、`app-after-mcu-poweron.raw` 和 `mcu/identity-summary.json`、`mcu/runtime-summary.json`。
 
 ## 1. APP健康截止存在可复现的过早断开
 

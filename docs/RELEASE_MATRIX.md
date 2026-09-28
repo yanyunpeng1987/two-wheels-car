@@ -1,18 +1,18 @@
 # 版本、构建与联调记录
 
-更新时间：2026-09-24。Git 标签、APK versionCode、固件内版本和实际在机内容是不同标识。没有明确配对证据时，不宣称 APP 与当前固件已联调通过。
+更新时间：2026-09-28。Git 标签、APK versionCode、固件内版本和实际在机内容是不同标识。没有明确配对证据时，不宣称 APP 与当前固件已联调通过。
 
 ## 仓库与源码状态
 
 | 对象 | 标识 | 证据与边界 |
 |---|---|---|
-| GitHub | 私有 `yanyunpeng1987/two-wheel-balancing-vehicle` | 本次使用已授权 Git 凭据查询 API 确认；默认分支 `main` |
-| `main` / `v0.1.0` | `499b420` | 初始 73 输入源码基线，不代表 APP/整车发布 |
-| 设备功能分支 | `codex/relax-gamepad-model-filter` / `82f3b45` | 74 输入；[PR #1](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/1) 草稿，2026-09-24 Actions 成功；原/新手柄待实测 |
-| 本次管理分支 | `codex/apk-firmware-management` / `2eca87f` 管理实现 | [PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2) 草稿；从 `82f3b45` 建立独立工作区；[源码与 Android CI](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829) 通过；不包含其他任务的未提交设备修改 |
+| GitHub | 私有 `yanyunpeng1987/two-wheels-car` | 2026-09-28 重命名后 API 确认；仓库 ID `1374359972` 不变，默认分支 `main` |
+| `v0.1.0` 初始基线 | `499b420` | 初始 73 输入源码基线，不代表 APP/整车发布 |
+| 设备功能分支 | `codex/relax-gamepad-model-filter` / `82f3b45` | 74 输入；[PR #1](https://github.com/yanyunpeng1987/two-wheels-car/pull/1) 建立时为草稿，现已合入 main；2026-09-24 Actions 成功；原/新手柄待实测 |
+| 本次管理分支 | `codex/apk-firmware-management` / `2eca87f` 管理实现 | [PR #2](https://github.com/yanyunpeng1987/two-wheels-car/pull/2) 建立时为草稿，现已合入 main；从 `82f3b45` 建立独立工作区；[源码与 Android CI](https://github.com/yanyunpeng1987/two-wheels-car/actions/runs/35967583829) 通过；不包含其他任务的未提交设备修改 |
 | 当前验收基线 | 电机极性 + T1/T2/T3/T4修复 | 77输入；用户确认T4正常、符合预期；本次通过codex/t4-firmware-stability整合至main，精确提交以对应PR/Git历史为准 |
 
-管理 PR 基于 PR #1 的分支审查。PR #1 合入后再将管理 PR 的 base 调整到 `main`，重新确认差异和 CI。保持草稿，避免把未验收硬件功能随管理文档自动发布。
+2026-09-28 核对：PR #1、#2、#3 均已合入 `main`。表内设备功能分支与管理分支标识保留建立时的历史背景；PR 合并只确认源码整合，不补充未完成的硬件或 APP 实测验收。
 
 日常主工作区仍保留原分支；管理文件已同步供后续开发阅读，因此主工作区 `git status` 会显示这些文件为修改/未跟踪，但它们已保存在管理分支。后续设备提交应按依赖整合管理分支或显式排除这些文件，避免用 `git add .` 重复混入；不要清理仍在研究的固件。
 

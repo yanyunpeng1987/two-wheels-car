@@ -29,7 +29,7 @@
 
 ### GitHub 初始化提交
 
-仓库为 [yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle)，可见性为私有，默认分支为 `main`，初始化源码标签为 `v0.1.0`。
+仓库为 [yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunpeng1987/two-wheels-car)，可见性为私有，默认分支为 `main`，初始化源码标签为 `v0.1.0`。
 
 提交范围为新工程源码、Keil/VS Code 配置、构建和验证工具、导入清单及开发文档。完整 `MiniBalan/` 参考包、编译产物、个人 `.uvoptx`、窗口布局及调试器本机配置保留在本地，不随 Git 上传。`.gitattributes` 对 `Firmware/` 禁止自动换行转换，避免改变 GBK/CRLF 文件字节。
 
@@ -91,7 +91,7 @@ Windows HidP 能力和纯内存逐 bit 解析确认：两个 Game Pad 报告均�
 
 HEX SHA-256：`8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`。
 
-代码提交 `bfba85f` 的 [GitHub Actions 回归](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35223822254) 已通过。Ubuntu runner 使用 GCC 实际编译并执行 `gamepad_report_test.c` 与 `gamepad_usb_adapter_test.c`，覆盖实测中位样本、独立四轴、极值、Hat、按键转换、异常长度、legacy 解码和输入清理/重连。测试直接链接生产解析与适配代码；适配层只用最小 USB 数据结构桩，不将结果表述为已验证 STM32 USB 枚举、控制传输或物理按键。
+代码提交 `bfba85f` 的 [GitHub Actions 回归](https://github.com/yanyunpeng1987/two-wheels-car/actions/runs/35223822254) 已通过。Ubuntu runner 使用 GCC 实际编译并执行 `gamepad_report_test.c` 与 `gamepad_usb_adapter_test.c`，覆盖实测中位样本、独立四轴、极值、Hat、按键转换、异常长度、legacy 解码和输入清理/重连。测试直接链接生产解析与适配代码；适配层只用最小 USB 数据结构桩，不将结果表述为已验证 STM32 USB 枚举、控制传输或物理按键。
 
 本次没有烧录，原手柄回归、新手柄在 STM32 接口 `0` 的控制验证、逐键标定和整车验收均未完成。复测步骤见 [手柄兼容说明](GAMEPAD_COMPATIBILITY.md)。
 
@@ -129,7 +129,7 @@ HEX SHA-256：`8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`
 
 已检查 Git、Keil、VS Code、启动脚本和 GitHub Actions：活动配置均无旧工作区绝对路径硬编码，使用相对路径或按脚本位置解析；无需重建仓库或修改源码。README 的克隆命令显式使用 `Two-wheels-Car` 作为本地目录，更新基线路径说明、CHANGELOG，并关闭 KI-003。上方“尚未改名”记录描述的是当时状态，不能作为当前状态使用。
 
-GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，origin、分支和 `v0.1.0` 标签保留。文档改动沿用 `codex/relax-gamepad-model-filter` 分支并关联现有 [PR #1](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/1)；PR 保持草稿，未自动合并。Codex 项目列表仍显示旧目录入口，需要在应用内重新关联 `Two-wheels-Car`；本任务后续命令已显式使用新目录。
+GitHub 继续使用私有仓库 `yanyunpeng1987/two-wheel-balancing-vehicle`，origin、分支和 `v0.1.0` 标签保留。文档改动沿用 `codex/relax-gamepad-model-filter` 分支并关联现有 [PR #1](https://github.com/yanyunpeng1987/two-wheels-car/pull/1)；PR 保持草稿，未自动合并。Codex 项目列表仍显示旧目录入口，需要在应用内重新关联 `Two-wheels-Car`；本任务后续命令已显式使用新目录。
 
 新目录实际执行 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -Action Rebuild`，日志 `Firmware/build/keil/rebuild-20260924-120923-c0a8af3a.log`，结果 **0 Error(s), 0 Warning(s)**。Code 84,748、RO 7,492、RW 104、ZI 28,048 字节；`python tools/verify_project.py --artifacts` 和 `python tools/sync_vscode.py --check` 通过。HEX 加载数据 92,348 字节、RAM 28,152 字节，PID 参数区无 HEX 数据。重新构建后的 HEX SHA-256 仍为 `8b60ffad57d7ac2e68ae3fcb543f9aed9a67cfa50e835739cb31e7fbe5f5ea03`，与迁移前完全一致。本次没有烧录或操作目标硬件。
 
@@ -249,7 +249,7 @@ CubeProgrammer2.7.0识别同一ST-Link目标为0x423、STM32F401xB/C、128KiB、
 
 回退可revert本次管理提交；原始材料与设备固件未被重排或删除。GitHub源码并不包含恢复APK所需全部本地输入，备份须另外保留。
 
-管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。
+管理实现已提交为 `2eca87f` 并推送，创建[草稿 PR #2](https://github.com/yanyunpeng1987/two-wheels-car/pull/2)，base为现有功能分支。该提交的push和PR两次GitHub Actions均成功，PR检查见[运行35967583829](https://github.com/yanyunpeng1987/two-wheels-car/actions/runs/35967583829)。DEV-001管理基线完成，main及PR #1保持不变。
 
 管理文件同步回日常主工作区时保留原分支与未提交内容；同步前后383个Firmware/tests文件哈希一致，原T2日志与停机测试CI步骤保留。主目录Android实际输入、76输入工程及VS Code同步检查通过。此次同步的文件版本已在管理分支，后续提交须按需求选路径或整合分支，不能整体暂存共享工作区。
 
@@ -304,3 +304,13 @@ T3基线备份、固定T4产物、源哈希和结果见build/voltage-filter-stag
 用户确认最新T4测试正常、符合预期，明确要求同步主程序分支并推送GitHub、保留修改记录；范围确认包含此前手柄和APP/固件管理基线。以已提交管理分支2a531d2建立独立codex/t4-firmware-stability工作区，按显式白名单导入31个固件/测试/文档文件，保留原共享目录及本地产物。补充验收说明与CHANGELOG，修正文档中已被后续证据替代的实验计划和不适用的旧固件回退指令。
 
 独立工作区5个纯C模块和3个集成runner共3619项检查通过，77输入/Android管理基线/编辑器同步检查通过。Keil全量日志rebuild-20260924-161813-07cacba5.log，0错误0警告；重建HEX SHA-256仍为3986cf56d190009946df4338f6b5cdd13ce72849bf95478a187142cd695d1271，精确复现已在机测试的T4。测试证据位于本地整合工作区build/release-tests，原始日志与二进制产物不提交。本次源代码同步未连接、复位或再次烧录设备。
+
+## 2026-09-28 — DEV-002：GitHub 仓库重命名
+
+用户确认账号为 `yanyunpeng1987`，将私有仓库从 `yanyunpeng1987/two-wheel-balancing-vehicle` 重命名为 `yanyunpeng1987/two-wheels-car`。仓库 ID 仍为 `1374359972`，所有者、私有可见性与默认分支 `main` 保持一致；这次没有转移到其他账号。
+
+重命名前后 Git 远程 refs 逐项一致：`main` 为 `d5ca3c91a2cdcc68e169a9ebf3314f9a7af7ef1f`，`v0.1.0` 标签对象为 `1b0a86ac7e012e9182240f09425f49a4ee7059f3`；本次文档提交会在该 main 基线上继续产生新提交。PR #1、#2、#3 在新地址仍为已合并状态，Source checks 工作流 ID `360476011` 保留；旧 Git 地址的 HEAD 查询返回相同提交。
+
+本机 5 个已登记 worktree 共用一个 Git 配置，`origin` 已更新为 `https://github.com/yanyunpeng1987/two-wheels-car.git`。本地 `Two-wheels-Car` 目录、Keil 工程与 Android 包名保持原样。README 的仓库/克隆地址、需求台账及版本矩阵已更新；历史日志保留当时仓库名称，历史 PR/Actions 链接改为现地址。
+
+改名前 Git 配置、refs 和工作区文件哈希保存在本地 `.git/codex-repository-migration/20260928-120719/`。需要恢复旧名称时，先在 GitHub 将同一仓库重命名回原名，再同步 origin；文档改动可单独 revert。不要在旧地址另建仓库，以免旧链接重定向失效。本次不包含固件或 APP 功能改动，也不进行设备操作。

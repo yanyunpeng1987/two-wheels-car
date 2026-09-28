@@ -4,16 +4,20 @@
 
 持续迭代从 [开发文档入口](docs/README.md) 开始：[需求台账](docs/REQUIREMENTS.md)、[通信协议](docs/PROTOCOL.md)、[版本与联调矩阵](docs/RELEASE_MATRIX.md)。Android 入口为 [Android/MVTBOT](Android/MVTBOT/README.md)，当前是 v21 Apktool 派生工程，尚无原始 Android Studio 源码；新克隆需另外恢复本地输入，不能只凭 GitHub 重建 APK。
 
-GitHub：[yanyunpeng1987/two-wheel-balancing-vehicle](https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle)（私有）。初始源码基线标签：`v0.1.0`；这不改变固件内部版本号。
+GitHub：[yanyunpeng1987/two-wheels-car](https://github.com/yanyunpeng1987/two-wheels-car)（私有）。初始源码基线标签：`v0.1.0`；这不改变固件内部版本号。
 
 新电脑先克隆仓库并安装下文所列工具：
 
 ```powershell
-git clone https://github.com/yanyunpeng1987/two-wheel-balancing-vehicle.git Two-wheels-Car
+git clone https://github.com/yanyunpeng1987/two-wheels-car.git Two-wheels-Car
 cd Two-wheels-Car
 ```
 
-`Two-wheels-Car` 是本地目录名，GitHub 仓库仍为 `two-wheel-balancing-vehicle`。目录改名不改变远程地址、分支、标签或 Pull Request；已保存的编辑器和 Codex 项目入口需重新选择新路径。
+`Two-wheels-Car` 是本地目录名，GitHub 仓库名为 `two-wheels-car`，所有者为 `yanyunpeng1987`。2026-09-28 已完成仓库重命名；现有克隆执行以下命令更新地址，本地目录无需改名：
+
+```powershell
+git remote set-url origin https://github.com/yanyunpeng1987/two-wheels-car.git
+```
 
 仓库包含设备固件构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，设备端新克隆也不需要它。Android 原包、派生输入、APK、原始日志及签名材料按模块说明分别保管。
 

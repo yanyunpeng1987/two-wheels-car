@@ -133,24 +133,29 @@ static void press_long(void)
     key_scan();
 }
 
-static void test_original_speed_boundaries(void)
+static void test_temporary_speed_boundaries(void)
 {
     static const struct {
         float volts, left, right;
         int expected;
     } cases[] = {
-        {12.0f, 90.0f, 90.0f, 0},
-        {12.0f, 90.9f, 90.9f, 0},
-        {12.0f, -90.9f, -90.9f, 0},
-        {12.0f, 91.0f, 90.0f, 1},
-        {12.0f, -91.0f, 90.0f, 1},
-        {11.0f, 85.0f, 85.0f, 0},
-        {11.0f, 85.9f, 85.9f, 0},
-        {11.0f, -85.9f, -85.9f, 0},
-        {11.0f, 86.0f, 85.0f, 1},
-        {11.0f, -86.0f, 85.0f, 1},
-        {11.0001f, 86.0f, 85.0f, 0},
-        {10.9999f, 86.0f, 85.0f, 1}
+        {12.0f, 180.0f, 180.0f, 0},
+        {12.0f, 180.9f, 180.9f, 0},
+        {12.0f, -180.9f, -180.9f, 0},
+        {12.0f, 181.0f, 180.0f, 1},
+        {12.0f, -181.0f, 180.0f, 1},
+        {11.0f, 170.0f, 170.0f, 0},
+        {11.0f, 170.9f, 170.9f, 0},
+        {11.0f, -170.9f, -170.9f, 0},
+        {11.0f, 171.0f, 170.0f, 1},
+        {11.0f, -171.0f, 170.0f, 1},
+        {11.0001f, 171.0f, 170.0f, 0},
+        {10.9999f, 171.0f, 170.0f, 1},
+        {12.2f, 0.0f, 253.663467f, 0},
+        {12.2f, 0.0f, 348.0f, 0},
+        {11.0f, 0.0f, 348.0f, 1},
+        {12.0f, 0.0f, 361.0f, 1},
+        {12.0f, 100.0f, 261.0f, 1}
     };
     unsigned int i;
     for (i = 0U; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -231,7 +236,7 @@ static void test_pickup_key_same_callback_preserves_final_angle_stop(void)
 {
     reset_fixture();
     record_final_gate(0.0f);
-    velocity_left = 181.0f;
+    velocity_left = 361.0f;
     CHECK(pick_up() == 1);
     flag_move = 0U; /* Original callback applies pick_up's decision. */
     press_long();
@@ -251,7 +256,7 @@ static void test_pickup_key_without_final_stop_does_not_freeze(void)
 {
     reset_fixture();
     record_final_gate(0.0f);
-    velocity_left = 181.0f;
+    velocity_left = 361.0f;
     CHECK(pick_up() == 1);
     flag_move = 0U;
     press_long();
@@ -279,7 +284,7 @@ static void test_original_angle_boundaries(void)
 
 int main(void)
 {
-    test_original_speed_boundaries();
+    test_temporary_speed_boundaries();
     test_acceleration_through_original_pick_up();
     test_key_stop_and_explicit_restart();
     test_pickup_key_same_callback_preserves_final_angle_stop();

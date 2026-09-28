@@ -774,8 +774,9 @@ int myabs(int a) {
 int pick_up(void) {
     uint8_t reason = CONTROL_STOP_NONE;
     const uint32_t cycles_per_ms = SystemCoreClock / 1000U;
-    /* Preserve the original integer truncation and voltage-dependent limits. */
-    const int speed_limit = (voltage > 11.0f) ? 180 : 170;
+    /* Temporary 2x SPD limits per user request (2026-09-28). */
+    /* Keep raw velocity inputs, integer truncation and the voltage branch. */
+    const int speed_limit = (voltage > 11.0f) ? 360 : 340;
     if (myabs(velocity_left) + myabs(velocity_right) > speed_limit) {
         reason |= CONTROL_STOP_SPD;
     }

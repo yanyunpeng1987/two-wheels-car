@@ -91,14 +91,9 @@ def main():
             raise ValueError("Duplicate APK entries")
         debug_name = "assets/mvtbot-debug-autoconnect.properties"
         debug_asset = args.snapshot / debug_name
-        if debug_asset.is_file():
-            if args.rollback_ui_only or debug_name not in names or z.read(debug_name) != debug_asset.read_bytes():
-                raise ValueError("Debug auto-connect asset differs from the explicit build input")
-            debug_config = {"enabled": True, "assetSha256": hashlib.sha256(z.read(debug_name)).hexdigest()}
-        else:
-            if debug_name in names:
-                raise ValueError("Normal build unexpectedly contains debug auto-connect configuration")
-            debug_config = {"enabled": False}
+        if debug_asset.is_file() or debug_name in names:
+            raise ValueError("Startup auto-connect configuration must be absent")
+        debug_config = {"enabled": False, "removed": True}
         dex_names = {n for n in names if n.startswith("classes") and n.endswith(".dex") and "/" not in n}
         required = set(expected) if args.rollback_ui_only else set(expected) | {"classes4.dex"}
         if dex_names != required:
@@ -122,9 +117,11 @@ def main():
     if rows["classes.dex"]["sha256"] == expected["classes.dex"]:
         raise ValueError("Primary DEX was not rebuilt")
     if not args.rollback_ui_only:
-        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation", "DebugAutoConnect")}
+        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation", "ManualBleScanner")}
         if not required <= dexes["classes4.dex"].classes:
             raise ValueError("New LINK-001 classes are missing")
+        if any(c.startswith("Lcom/mvtbot/link/DebugAutoConnect") for c in classes):
+            raise ValueError("Removed startup auto-connect implementation remains in APK")
         refs = {m for m in dexes["classes.dex"].methods if m.startswith("Lcom/mvtbot/link/")}
         if not refs:
             raise ValueError("Main DEX does not reference the LINK-001 bridge")

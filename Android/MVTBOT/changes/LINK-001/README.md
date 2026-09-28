@@ -9,7 +9,7 @@ to scan results, or identify a product from its advertised name.
 - `../../link/src/com/mvtbot/link/`: maintained Java, compiled against Android
   API 36 with Java 8 bytecode; D8 minimum API 23. No original application classes
   are compilation dependencies.
-- `patch_smali.py --smali-root <isolated decoded project/smali>`: eleven-file
+- `patch_smali.py --smali-root <isolated decoded project/smali>`: twelve-file
   bridge with exact v21 input hashes in `smali-baseline.json`. Only LF/CRLF is
   normalized. It checks all inputs before mutation. A second application verifies
   the complete output manifest and does nothing. A changed script or output
@@ -136,19 +136,27 @@ The per-session state machine is `NORMAL -> IDENTIFYING -> PROBING -> VALIDATED`
   Data is not padded, the write mode does not change, and commands are not retried.
   Observed/adapted status-13 counters and data/wire lengths remain diagnostic.
 
-The compatibility session centrally owns voltage health queries. The legacy
-approximately-one-second UI CMD7 ticker coalesces into that owner, with at most
-one query queued, writing or awaiting a notification. Stop has highest priority;
-already-queued motion precedes the health query, and newer motion cannot
-continually overtake that queued query. Ordinary configuration follows, and an
-in-progress frame is never interleaved. A query is due after 1000 ms. Its actual
-submission starts a 1500 ms round-trip deadline, while 2500 ms without a fresh
-qualified CMD7 independently closes the session and clears movement. Both a
-write completion and a valid voltage notification are required before the query
-slot is released. The health clock uses notification arrival, not a later write
-callback. Duplicate/out-of-window, invalid, partial and non-voltage frames do not
-refresh it. The presentation decoder is separate, so resetting query assembly
-does not erase a fragmented PID response.
+The compatibility session centrally owns voltage queries and coalesces the legacy
+UI ticker. A query becomes due after 1000 ms, may wait in the queue for at most
+1500 ms, and receives its own 1500 ms deadline after actual submission. ATT
+writes retain the independent 750 ms deadline. A fresh complete CMD7 and its
+write completion are both required; notification time, not callback time, is
+used for freshness.
+
+The former 2500 ms freshness cutoff now suspends old motion instead of closing
+a still-budgeted query. A completed write with one missing reply permits exactly
+one read-only CMD7 retry; repeated loss, stalled queue or stalled write closes
+within its deadline. Nonzero motion and parameter writes are never replayed.
+Recovery latches a neutral/release requirement: held input cannot restart motion,
+including through reset callback re-entry. After a new proof, the user must
+release the joystick or return gravity input to neutral before the normal double
+zero rearm. Foreground users get one pause/recovery notice per recovery cycle;
+background and stale sessions do not produce notices. The GATT-connected icon
+remains connected during bounded recovery.
+
+A separate decoder resets at actual query submission. Old, partial, invalid or
+non-voltage frames cannot satisfy the health proof. Diagnostics record queue,
+submission, notification and callback times plus close and cleanup outcomes.
 
 Connection replacement/disconnect clears the profile, pending reads, query state
 and counters. The protocol has no request IDs; single-query ownership and local
@@ -200,43 +208,33 @@ idempotent, including an already-unregistered receiver. Manager destruction
 unregisters before clearing its receiver/context, so service disconnection
 cannot leave the static registration flag blocking a later manager instance.
 
-## Optional local diagnostic auto-connect
+## Manual scanning and removal of startup auto-connect
 
-Normal builds remain manual. A diagnostic build may contain exactly one local
-asset, `assets/mvtbot-debug-autoconnect.properties`, with two ASCII properties:
-`enabled=true` and `targetAddress=<explicitly verified local device address>`.
-The target is supplied locally to the build; it is not a source-code default or
-a tracked configuration. Missing, disabled or invalid configuration never scans.
-Application logs omit the address. `DebugAutoConnect.java` is ordinary maintained
-source included with the other link classes, without an additional smali hook.
+The v36 diagnostic auto-connect helper and target asset were removed at the
+user's request. Current packaging rejects the old asset and any residual helper
+class. No scan or connection starts just from launching/resuming MiniBalan.
 
-After `bind`, MiniBalan selection and 500 ms of stable foreground readiness,
-this option makes one BLE scan attempt per application process, with an exact-address platform
-filter and a 10-second monotonic deadline. A real scan result must match that
-address again before the scanner stops and the normal connection method runs.
-Device names and RSSI never choose a replacement; no cached or paired-device
-record alone triggers connection. Individual and batched results share the same
-guard. No match, scan failure, missing permission or disabled Bluetooth consumes
-the attempt without retrying. Another attempt requires a new process.
+`ManualBleScanner` owns one modern Android scan. The Mini picker is constructed
+once and starts only after it is shown. Selection, dismiss/outside cancel,
+background, destroy and explicit connection stop scanning. Session identity
+rejects late callbacks; a cancellable 10-second timeout belongs to that scan.
+A repeated show is idempotent and an old picker cannot stop its replacement.
+Other robot picker methods retain the original v21 implementations.
 
-An initial foreground wait interrupted by `onPause` (such as the startup
-landscape configuration change) is cancelled without consuming the scan attempt;
-`onResume` may schedule a new full 500 ms wait. A manual connection/disconnection,
-leaving MiniBalan or Activity destruction also cancels a pending wait and consumes
-the attempt. Backgrounding after the actual scan starts consumes it too.
-Tokens reject queued preparation tasks, results, failures and timeouts after
-cancellation; once the attempt is consumed, later resume cannot reconnect.
-An automatic connection retains the same profile proof, startup zeros, health
-queries, manual-disconnect behavior and prohibition on replaying prior motion.
-This is a diagnostic convenience, not a replacement for selecting and verifying
-the local vehicle or a new production auto-reconnect policy.
+The scanner limits its own requests to four starts per 30 seconds with at least
+6.5 seconds between starts. These are application policy, not a claim about a
+particular phone's system quota. Async failure 6 produces a 30-second cooldown;
+other scan failures use 6.5 seconds. The user sees the failure/wait state and
+explicitly requests a new scan. There is no automatic retry or automatic
+selection by name/RSSI.
 
 ## Reproducible checks
 
 ```powershell
 python Android/MVTBOT/link/tests/test_smali_bridge.py
 python Android/MVTBOT/link/tests/test_ble_session.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
-python Android/MVTBOT/link/tests/test_debug_autoconnect.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
+python Android/MVTBOT/link/tests/test_health_recovery.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
+python Android/MVTBOT/link/tests/test_manual_scanner.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
 python Android/MVTBOT/link/tests/test_startup_subscriptions.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21" --cc <path-to-zig.exe>
 ```
 
@@ -246,31 +244,15 @@ deterministic Android fakes and checks session, GATT-selection, queue, framing
 and control lifetime contracts. These checks do not replace Android verifier,
 real-phone, real-module, background/foreground or vehicle acceptance tests.
 
-The v32 BLE suite passes 444 assertions, including both health callback orders,
-slow callbacks, startup cancellation, bounded priority requests and PID echo
-suppression. The startup test feeds timestamped writes from the actual Java
-through the actual MCU `bluetooth.c` and `bluetooth_link.c` with the HAL fixture.
-It starts with reporting `[0,0,1]`, checks both ISR/main-loop orders and receive
-delays, and records 38 schedules plus 9 Java assertions in
-`build/hc05d-validation/startup-subscriptions/report.json`. All tested 60 ms
-callback schedules and the 180 ms cases without extra UART delivery delay
-finish at `[1,1,0]`. A separate legacy-boundary fixture demonstrates how a
-subscription can be lost at the 500 ms epoch transition while error counters
-remain zero; it is not a reconstruction of the exact phone incident.
+The v38 suite passes 446 BLE, 618 health-recovery and 97 manual-scanner checks.
+The startup test feeds actual Java writes through actual MCU source under 38
+schedules. All now finish at reporting [1,1,0], including the former epoch-drop
+regression and slow delivery offsets. The separate cross-stack rearm replay
+covers five scenarios under both MCU processing orders (64 MCU frame assertions
+and 53 Java assertions).
 
-The same report preserves two incomplete edge cases: 180 ms callbacks with
-40 ms additional UART delivery delay and ISR before the main loop can lose CMD5
-at that boundary, leaving `[1,0,0]`. The BLE suite also measures motion gaps of
-540/720/900 ms for response callbacks delayed by 270/360/450 ms. Such links exceed
-the unchanged MCU 500 ms motion lease and correctly stop movement. The new
-startup refresh and HIGH requests therefore require real negotiated-parameter,
-telemetry and motion checks; passing a health query does not certify continuous
-control on an arbitrarily slow link.
-
-The diagnostic auto-connect replay uses synthetic addresses and separate JVMs
-for process-lifetime scenarios. It checks disabled configuration, exact result
-filtering, deadline expiry before the timeout Runnable executes, denied/failed
-scans, manual-operation priority, lifecycle cancellation, the cold-start
-100 ms pause/220 ms resume sequence, and the actual
-MiniBalan handshake through the automatic entry point. These host tests do not
-scan or connect to a radio device.
+The serial ATT bandwidth limitation remains: simulated callback delays of
+270/360/450 ms can produce motion gaps of 540/720/900 ms when a separate query
+interleaves. The MCU 500 ms lease remains unchanged. Passing bounded recovery
+and query tests does not establish physical continuous-motion performance;
+that requires the actual paired APK/firmware and device validation.

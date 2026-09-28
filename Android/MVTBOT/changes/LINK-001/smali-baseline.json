@@ -8,6 +8,7 @@
   "com/Wonder/bot/MainActivity$MsgCallBack.smali": "43e2beb4fd88ebb2b2673ae8a477d176093c5f59b232ea1604ae4354305615a0",
   "com/Wonder/bot/fragment/MiniBalan/BalanceCarControlFragment.smali": "ae96b8feaee5f0558e89a8b0a084c3d4537c193c766d8da47321508e42075f55",
   "com/Wonder/bot/fragment/MiniBalan/BalanceCarHomePageFragment.smali": "0b5f8e0eb044aebe73ca591d8562081a402a1700e18332048848b436f2dfcc3c",
+  "com/Wonder/bot/dialog/SearchDeviceDialog.smali": "c1e67c66173953b0856bba3d5d4ec8067dce58611a750cf337e430e0c47e21db",
   "com/Wonder/bot/dialog/SearchDeviceDialog$1.smali": "aeb0fe900aecc2425dd02cd21cd47fe80670f0fe707a36d615469e411329d582",
   "com/Wonder/bot/dialog/SearchDeviceDialog$BluetoothDataAdapter.smali": "fa5c00063ba04a324ec809bb6cddc09042ecb0db7a06e7aa0764998286cb3da3"
 }

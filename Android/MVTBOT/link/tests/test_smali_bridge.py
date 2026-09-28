@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Replay patch application, exact-baseline rejection, and lifecycle hook checks."""
+import argparse
 import importlib.util
 import json
 from pathlib import Path
@@ -26,6 +27,52 @@ def copy_inputs(reference, root, targets):
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(reference / relative, target)
+
+
+def check_manual_picker(root, reference):
+    relative = patch.BASE + 'dialog/SearchDeviceDialog.smali'
+    text = (root / relative).read_text(encoding='utf-8')
+    original = (reference / relative).read_text(encoding='utf-8')
+    create = 'createDialog(Landroid/app/Activity;IILcom/Wonder/bot/dialog/SearchDeviceDialog$OnDeviceSelectedListener;)Lcom/Wonder/bot/dialog/SearchDeviceDialog;'
+    factory = patch.find_method(text, create)
+    assert factory.count('-><init>(Landroid/app/Activity;Landroid/view/View;II)V') == 1
+    assert factory.index('->isLandscape(') < factory.index('-><init>(Landroid/app/Activity;Landroid/view/View;II)V')
+    assert 'move-result v1\n\n    if-eqz v1,' in factory, 'portrait width p1 must survive orientation test'
+    constructor = patch.find_method(text, '<init>(Landroid/app/Activity;Landroid/view/View;II)V')
+    assert constructor.index('->mvtbotMiniSelected()Z') < constructor.index('if-nez p1, :link_constructor_done') < constructor.index('->scanBLEDevice()V')
+    shown = patch.find_method(text, 'showDialog()V')
+    assert shown.index('->showDialog$v21()V') < shown.index('->scanBLEDevice()V')
+    scan = patch.find_method(text, 'scanBLEDevice()V')
+    assert 'ManualBleScanner;->start(' in scan and '->startLeScan' not in scan
+    assert 'ManualBleScanner;->stop(' in patch.find_method(text, 'stopScan()V')
+    dismiss = patch.find_method(text, 'dismiss()V')
+    assert dismiss.index('ManualBleScanner;->stop(') < dismiss.index('PopupWindow;->dismiss()V')
+    selected = patch.find_method(text, 'onItemClick(Landroid/widget/AdapterView;Landroid/view/View;IJ)V')
+    assert selected.index('.end annotation') < selected.index('ManualBleScanner;->stop('), 'DEX keeps method annotations before instructions'
+    assert selected.index('ManualBleScanner;->stop(') < selected.index('->onDeviceSelected(')
+    for signature in (create, 'showDialog()V', 'scanBLEDevice()V', 'stopScan()V'):
+        name, rest = signature.split('(', 1)
+        legacy = name + '$v21(' + rest
+        assert patch.find_method(text, legacy) == patch.find_method(original, signature).replace(' ' + signature + '\n', ' ' + legacy + '\n', 1), 'other robot legacy method changed: ' + signature
+
+
+def check_picker_roundtrip(reference, decoded):
+    """Compare the full patched class to a real APK decode; never ignore method bodies."""
+    def load(name, file):
+        spec = importlib.util.spec_from_file_location(name, file)
+        result = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(result)
+        return result
+    equivalent = load('picker_equivalence', MODULE / 'tools/smali_equivalence.py')
+    helper = load('picker_normalization', MODULE / 'tools/Apply-UiPatch.py')
+    relative = patch.BASE + 'dialog/SearchDeviceDialog.smali'
+    expected = patch.transform(relative, (reference / relative).read_text(encoding='utf-8'))
+    actual = (decoded / 'smali' / relative).read_text(encoding='utf-8')
+    assert equivalent.equivalent_smali(expected, actual, helper.normalize_smali), 'real APK picker differs from all expected methods/metadata'
+    stop = '    invoke-static {p0}, Lcom/mvtbot/link/ManualBleScanner;->stop(Landroid/widget/PopupWindow;)V'
+    damaged = actual.replace(stop, '    nop', 1)
+    assert damaged != actual and not equivalent.equivalent_smali(expected, damaged, helper.normalize_smali), 'full roundtrip comparison must reject removed scan cleanup'
+    print('Real APK picker roundtrip: PASS (full class/method bodies, annotation placement, executable mutation rejected)')
 
 
 def replay_ui(data, edit):
@@ -71,6 +118,7 @@ def combined_replay(reference):
                 data = replay_ui_resource((MODULE / 'project' / edit['path']).read_bytes(), edit)
                 file.write_bytes(data)
             record = patch.apply(root, ui_path)
+            check_manual_picker(root, reference)
             assert record['ui_profile']['source_commit'] == 'aa000240b183a8daeed3f09ca084cdf9335e0076'
             assert patch.apply(root, ui_path) == record
             verifier.check_smali(root)
@@ -115,6 +163,9 @@ def combined_replay(reference):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--roundtrip-root', type=Path, help='Optional real final-decoded directory for the full picker DEX roundtrip regression')
+    args = parser.parse_args()
     reference = MODULE / 'materials/analysis/original-base-apktool/smali'
     with tempfile.TemporaryDirectory(prefix='mvtbot-bridge-test-') as temp:
         root = Path(temp)
@@ -123,6 +174,7 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(reference / relative, target)
         record = patch.apply(root)
+        check_manual_picker(root, reference)
         assert patch.apply(root) == record
         manager = (root / patch.BASE / 'BluetoothConnect/BLEManager.smali').read_text()
         main = (root / patch.BASE / 'MainActivity.smali').read_text()
@@ -165,6 +217,8 @@ def main():
             assert 'baseline mismatch' in str(error)
     print('Smali bridge replay: PASS (idempotence, hooks, tamper/baseline refusal)')
     combined_replay(reference)
+    if args.roundtrip_root is not None:
+        check_picker_roundtrip(reference, args.roundtrip_root)
 
 
 if __name__ == '__main__':

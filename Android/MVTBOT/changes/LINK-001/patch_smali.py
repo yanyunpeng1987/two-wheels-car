@@ -13,11 +13,12 @@ import re
 
 BASE = "com/Wonder/bot/"
 LINK = "Lcom/mvtbot/link/MiniBalanLink;"
+SCAN = "Lcom/mvtbot/link/ManualBleScanner;"
 MAN = "Lcom/Wonder/bot/BluetoothConnect/BLEManager;"
 MAIN = "Lcom/Wonder/bot/MainActivity;"
 CTRL = "Lcom/Wonder/bot/fragment/MiniBalan/BalanceCarControlFragment;"
 MARKER = ".mvtbot-link-001.json"
-PATCH_VERSION = 3
+PATCH_VERSION = 4
 UI_COMMIT = "aa000240b183a8daeed3f09ca084cdf9335e0076"
 UI_PATCH_SHA256 = "953db3d574a712fa707e11ba192c28d59f3758f8c80f3a2808016a423e9e1eef"
 
@@ -502,6 +503,91 @@ def transform(relative, text, ui_fixed=False):
     return-void
 .end method
 """
+    elif relative == BASE + "dialog/SearchDeviceDialog.smali":
+        cls = "Lcom/Wonder/bot/dialog/SearchDeviceDialog;"
+        create = "createDialog(Landroid/app/Activity;IILcom/Wonder/bot/dialog/SearchDeviceDialog$OnDeviceSelectedListener;)Lcom/Wonder/bot/dialog/SearchDeviceDialog;"
+        factory = find_method(text, create)
+        # Preserve the exact legacy method for other robots. Mini computes dimensions
+        # first and constructs once; constructors never start its scan.
+        construction = f"    new-instance v1, {cls}\n\n    invoke-direct {{v1, p0, v0, p1, p2}}, {cls}-><init>(Landroid/app/Activity;Landroid/view/View;II)V"
+        if factory.count(construction) != 2:
+            raise ValueError("expected two v21 picker constructions")
+        factory = factory.replace(construction, "")
+        factory = replace_once(factory, "    move-result p1\n\n    if-eqz p1, :cond_0", "    move-result v1\n\n    if-eqz v1, :cond_0")
+        factory = replace_once(factory, f"    :cond_0\n    iput-object v0, v1, {cls}->view:Landroid/view/View;",
+                               f"    :cond_0\n{construction}\n\n    iput-object v0, v1, {cls}->view:Landroid/view/View;")
+        body = factory.split("\n", 1)[1].rsplit("\n.end method", 1)[0]
+        body = replace_once(body, "    .locals 3", f"""    .locals 3
+    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result v1
+    if-eqz v1, :link_legacy""")
+        body += f"""
+    :link_legacy
+    invoke-static {{p0, p1, p2, p3}}, {cls}->createDialog$v21(Landroid/app/Activity;IILcom/Wonder/bot/dialog/SearchDeviceDialog$OnDeviceSelectedListener;)Lcom/Wonder/bot/dialog/SearchDeviceDialog;
+    move-result-object v1
+    return-object v1
+"""
+        text = wrap(text, create, body)
+        # scanBLEDevice is also called by research; anchor the constructor method only.
+        constructor = find_method(text, "<init>(Landroid/app/Activity;Landroid/view/View;II)V")
+        updated = replace_once(constructor, f"    invoke-virtual {{p0}}, {cls}->scanBLEDevice()V", f"""    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result p1
+    if-nez p1, :link_constructor_done
+    invoke-virtual {{p0}}, {cls}->scanBLEDevice()V
+    :link_constructor_done""")
+        text = replace_once(text, constructor, updated)
+        text = wrap(text, "showDialog()V", f"""
+    .locals 1
+    invoke-virtual {{p0}}, {cls}->showDialog$v21()V
+    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result v0
+    if-eqz v0, :link_done
+    invoke-virtual {{p0}}, {cls}->scanBLEDevice()V
+    :link_done
+    return-void
+""")
+        text = wrap(text, "scanBLEDevice()V", f"""
+    .locals 4
+    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result v0
+    if-eqz v0, :link_legacy
+    iget-object v0, p0, {cls}->mBluetoothAdapter:Landroid/bluetooth/BluetoothAdapter;
+    iget-object v1, p0, {cls}->leCallBack:Landroid/bluetooth/BluetoothAdapter$LeScanCallback;
+    iget-object v2, p0, {cls}->titleTV:Landroid/widget/TextView;
+    iget-object v3, p0, {cls}->progressView:Lcom/Wonder/bot/component/CircularProgressView;
+    invoke-virtual {{v3}}, Lcom/Wonder/bot/component/CircularProgressView;->resetAnimation()V
+    invoke-static {{p0, v0, v1, v2, v3}}, {SCAN}->start(Landroid/widget/PopupWindow;Landroid/bluetooth/BluetoothAdapter;Landroid/bluetooth/BluetoothAdapter$LeScanCallback;Landroid/widget/TextView;Landroid/view/View;)V
+    return-void
+    :link_legacy
+    invoke-virtual {{p0}}, {cls}->scanBLEDevice$v21()V
+    return-void
+""")
+        text = wrap(text, "stopScan()V", f"""
+    .locals 1
+    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result v0
+    if-eqz v0, :link_legacy
+    invoke-static {{p0}}, {SCAN}->stop(Landroid/widget/PopupWindow;)V
+    return-void
+    :link_legacy
+    invoke-virtual {{p0}}, {cls}->stopScan$v21()V
+    return-void
+""")
+        # Method annotations precede executable code in a DEX round trip. Insert
+        # after the existing Signature annotation, not immediately after .locals.
+        selected = find_method(text, "onItemClick(Landroid/widget/AdapterView;Landroid/view/View;IJ)V")
+        updated = replace_once(selected, "    .line 278\n",
+                               f"    invoke-static {{p0}}, {SCAN}->stop(Landroid/widget/PopupWindow;)V\n\n    .line 278\n")
+        text = replace_once(text, selected, updated)
+        text += f"""
+
+.method public dismiss()V
+    .locals 0
+    invoke-static {{p0}}, {SCAN}->stop(Landroid/widget/PopupWindow;)V
+    invoke-super {{p0}}, Landroid/widget/PopupWindow;->dismiss()V
+    return-void
+.end method
+"""
     elif relative == BASE + "dialog/SearchDeviceDialog$1.smali":
         # Only MiniBalan changes its inclusion policy; other robot lists retain v21 behavior.
         cls = "Lcom/Wonder/bot/dialog/SearchDeviceDialog$1;"
@@ -551,7 +637,7 @@ def transform(relative, text, ui_fixed=False):
 TARGETS = [BASE + value for value in (
     "BluetoothConnect/BLEManager.smali", "BluetoothConnect/BLEManager$1.smali", "BluetoothConnect/BLEManager$2.smali", "BluetoothConnect/BLEManager$3.smali", "BluetoothConnect/BLEService.smali",
     "MainActivity.smali", "MainActivity$MsgCallBack.smali", "fragment/MiniBalan/BalanceCarControlFragment.smali", "fragment/MiniBalan/BalanceCarHomePageFragment.smali",
-    "dialog/SearchDeviceDialog$1.smali", "dialog/SearchDeviceDialog$BluetoothDataAdapter.smali",
+    "dialog/SearchDeviceDialog.smali", "dialog/SearchDeviceDialog$1.smali", "dialog/SearchDeviceDialog$BluetoothDataAdapter.smali",
 )]
 
 

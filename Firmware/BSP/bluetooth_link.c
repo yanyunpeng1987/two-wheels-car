@@ -14,10 +14,11 @@ uint8_t bt_parser_feed(BtParser *parser, uint8_t byte, uint32_t received_cycles,
 {
     static const char prefix[] = "CMD|";
     if (parser->length != 0U &&
-        (parser->epoch != epoch ||
-         (uint32_t)(received_cycles - parser->first_cycles) >= timeout_cycles)) {
+        (uint32_t)(received_cycles - parser->first_cycles) >= timeout_cycles) {
         parser->length = 0U;
     }
+    /* Keep the first byte's motion epoch across fragments. The caller may serve
+       a complete query after expiry, but must reject old motion/PID writes. */
     /* C cannot occur in any numeric payload. It is an unambiguous resync. */
     if (byte == (uint8_t)'C') {
         parser->length = 1U;

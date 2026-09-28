@@ -70,7 +70,10 @@ static void test_parser(void)
     assert(feed(&parser, "CMD|3|1", 5U, 1U) == 0U);
     assert(feed(&parser, "|0|$", 505U, 1U) == 0U);
     assert(feed(&parser, "CMD|3|0", 510U, 1U) == 0U);
-    assert(feed(&parser, "|0|$", 511U, 2U) == 0U);
+    assert(feed(&parser, "|0|$", 511U, 2U) == 1U);
+    /* Parsing may finish across an epoch, but its old identity cannot be lost. */
+    assert(parser.epoch == 1U && parser.first_cycles == 510U);
+    assert(bt_decode_command(parser.data, &command) && command.code == 3U);
     assert(feed(&parser, "CMD|xCMD|7|$", 512U, 2U) == 1U);
     memcpy(maximum, "CMD|3|", 6U);
     memset(maximum + 6U, '0', BT_WIRE_MAX - 10U);
@@ -82,6 +85,34 @@ static void test_parser(void)
     maximum[6] = '0';
     assert(feed(&parser, maximum, 530U, 2U) == 0U);
     assert(feed(&parser, "CMD|7|$", 531U, 2U) == 1U);
+}
+
+static void test_parser_epoch_identity(void)
+{
+    const char *frames[] = { "CMD|3|0|0|$", "CMD|1|-4.0|$", "CMD|2|1|140|450|$",
+                             "CMD|8|2|$", "CMD|7|$", "CMD|8|1|$", "CMD|4|1|$" };
+    BtParser parser;
+    unsigned int f;
+    size_t split, i;
+    for (f = 0U; f < sizeof(frames) / sizeof(frames[0]); ++f) {
+        for (split = 1U; split < strlen(frames[f]); ++split) {
+            unsigned int count = 0U;
+            bt_parser_reset(&parser);
+            for (i = 0U; i < strlen(frames[f]); ++i)
+                count += bt_parser_feed(&parser, (uint8_t)frames[f][i],
+                                        i < split ? 499U : 501U,
+                                        i < split ? 1U : 2U, 500U);
+            assert(count == 1U && strcmp(parser.data, frames[f]) == 0);
+            assert(parser.epoch == 1U && parser.first_cycles == 499U);
+        }
+    }
+    bt_parser_reset(&parser);
+    assert(feed(&parser, "CMD|3|0|", 1U, 1U) == 0U);
+    assert(feed(&parser, "CMD|7|$", 2U, 2U) == 1U);
+    assert(parser.epoch == 2U && parser.first_cycles == 2U);
+    bt_parser_reset(&parser);
+    assert(feed(&parser, "CMD|7", UINT32_MAX - 100U, 1U) == 0U);
+    assert(feed(&parser, "|$", 399U, 2U) == 0U); /* 500ms framing age, including wrap. */
 }
 
 static void test_guard(void)
@@ -158,6 +189,7 @@ int main(void)
 {
     test_decode();
     test_parser();
+    test_parser_epoch_identity();
     test_guard();
     test_tx();
     puts("bluetooth_link: parser, strict values, lease/re-arm and TX ownership passed");

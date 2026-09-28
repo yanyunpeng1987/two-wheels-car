@@ -14,6 +14,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -38,7 +40,7 @@ public final class MiniBalanLink {
     private static final String ZERO = "CMD|3|0|0|$", VOLTAGE_QUERY = "CMD|7|$";
     private static final int MAX_QUEUE = 24, ATT_PAYLOAD = 20;
     private static final long CONNECT_TIMEOUT_MS = 10000, WRITE_TIMEOUT_MS = 750, WRITE_GAP_MS = 30, HEARTBEAT_MS = 100, REARM_ZERO_GAP_MS = 100;
-    private static final long HEALTH_INTERVAL_MS = 1000, HEALTH_QUERY_TIMEOUT_MS = 1500, HEALTH_MAX_AGE_MS = 2500;
+    private static final long HEALTH_INTERVAL_MS = 1000, HEALTH_QUEUE_TIMEOUT_MS = 1500, HEALTH_QUERY_TIMEOUT_MS = 1500, HEALTH_MAX_AGE_MS = 2500;
     private static final Handler LOOP = new Handler(Looper.getMainLooper());
     private static final ReentrantLock LEGACY_GATE = new ReentrantLock();
     private static final ThreadLocal<Long> LEGACY_DISPATCH = new ThreadLocal<>();
@@ -56,10 +58,6 @@ public final class MiniBalanLink {
     private static WeakReference<Handler> ui = new WeakReference<>(null);
     private static WeakReference<ControlReset> control = new WeakReference<>(null);
     private static WeakReference<View> controlView = new WeakReference<>(null);
-    private static final DebugAutoConnect DEBUG_AUTO = new DebugAutoConnect(LOOP, new DebugAutoConnect.Listener() {
-        public boolean canConnect() { return owned && foreground && ui.get() != null && gatt == null && !closing; }
-        public void connect(BluetoothDevice device) { MiniBalanLink.connect(device); }
-    });
     private static boolean foreground, heartbeat, armPending, gravityControl, gravityNeutralRequired = true;
     private static long gestureToken;
     private static String latestMotion = ZERO;
@@ -74,7 +72,10 @@ public final class MiniBalanLink {
     private static int profileIndex, observed13, adapted13;
     private static BluetoothGattCharacteristic profileRead;
     private static long profileReadTicket, healthToken, healthSubmittedNanos, lastHealthValidAt, healthFrameAt, healthReceiveAt;
-    private static boolean healthPending, healthSubmitted, healthWriteDone;
+    private static boolean healthPending, healthSubmitted, healthWriteDone, healthRecovering, motionNeutralRequired, resettingControl;
+    private static int healthAttempt;
+    private static long healthEnqueuedAt = -1, healthSubmittedAt = -1, healthWriteCompleteAt = -1;
+    private static long writeSubmittedAt = -1, writeCallbackAt = -1;
     private static String healthVoltage;
     private static Tx healthTx;
     // Diagnostic context only. In no-response mode this describes the latest
@@ -123,23 +124,20 @@ public final class MiniBalanLink {
     public static void bind(Context appContext, Handler handler) {
         context = appContext.getApplicationContext();
         ui = new WeakReference<>(handler);
-        DEBUG_AUTO.bind(context);
-        DEBUG_AUTO.consider();
     }
     /** Claim the explicitly selected MiniBalan path even before a device is picked.
      * A still-connected legacy robot must not become this page's transport.
      */
     public static void selectMini() {
-        if (owned) { DEBUG_AUTO.consider(); return; }
+        if (owned) return;
         setOwned(true);
         generation++;
         resetControl();
-        DEBUG_AUTO.consider();
     }
     public static boolean connect(BluetoothDevice device) { return connect(context, ui.get(), device); }
 
     public static boolean connect(Context appContext, Handler handler, BluetoothDevice device) {
-        DEBUG_AUTO.cancel("explicit connection");
+        ManualBleScanner.cancel("explicit connection");
         if (appContext == null || handler == null || device == null) {
             Log.w(TAG, "connect rejected before GATT: contextPresent=" + (appContext != null)
                 + " handlerPresent=" + (handler != null) + " devicePresent=" + (device != null)
@@ -237,8 +235,10 @@ public final class MiniBalanLink {
                 acceptProfileRead(source, characteristic, value == null ? null : value.clone(), status, session);
             }
             @Override public void onCharacteristicWrite(BluetoothGatt source, BluetoothGattCharacteristic characteristic, int status) {
+                final long receivedAt = android.os.SystemClock.uptimeMillis();
                 LOOP.post(() -> {
                     if (!current(session, source) || characteristic != write || !ready) return;
+                    writeCallbackAt = receivedAt;
                     if (status == 13) observed13++;
                     if (status != BluetoothGatt.GATT_SUCCESS) {
                         if (mayIdentifyProfile(status)) {
@@ -258,7 +258,10 @@ public final class MiniBalanLink {
                     if (waitingWrite) {
                         waitingWrite = false;
                         writeTicket++;
-                        if (healthPending && active == healthTx && active.offset == active.bytes.length) healthWriteDone = true;
+                        if (healthPending && active == healthTx && active.offset == active.bytes.length) {
+                            healthWriteDone = true;
+                            healthWriteCompleteAt = receivedAt;
+                        }
                         completeHealth();
                         // nextWriteAt already enforces the minimum submission gap.
                         // A slow response must not incur another unconditional 30ms.
@@ -334,7 +337,20 @@ public final class MiniBalanLink {
             + " latestSubmission=" + submittedWrites + " offset=" + submittedOffset + " len=" + submittedLength
             + " dataLen=" + submittedLength + " wireLen=" + submittedWireLength + " compatibility=" + compatibility
             + " frameLen=" + submittedFrameLength + " advancedOffset=" + (active == null ? -1 : active.offset)
-            + " waitingResponse=" + waitingWrite + " queueDepth=" + queue.size();
+            + " waitingResponse=" + waitingWrite + " queueDepth=" + queue.size()
+            + " submittedAt=" + writeSubmittedAt + " callbackAt=" + writeCallbackAt
+            + " writeAgeMs=" + elapsed(writeSubmittedAt);
+    }
+    private static long elapsed(long at) {
+        return at < 0 ? -1 : android.os.SystemClock.uptimeMillis() - at;
+    }
+    private static String healthMetadata() {
+        return "healthAttempt=" + healthAttempt + " pending=" + healthPending + " submitted=" + healthSubmitted
+            + " writeDone=" + healthWriteDone + " voltageReceived=" + (healthVoltage != null)
+            + " recovering=" + healthRecovering + " enqueuedAt=" + healthEnqueuedAt
+            + " submittedAt=" + healthSubmittedAt + " receivedAt=" + (healthVoltage == null ? -1 : healthFrameAt)
+            + " writeCompleteAt=" + healthWriteCompleteAt + " queueAgeMs=" + elapsed(healthEnqueuedAt)
+            + " queryAgeMs=" + elapsed(healthSubmittedAt) + " lastValidAgeMs=" + elapsed(lastHealthValidAt);
     }
     private static boolean vendorGattProfile() {
         return writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT && write != null && write == notify
@@ -413,7 +429,8 @@ public final class MiniBalanLink {
             readNextProfileField();
         });
     }
-    private static void requestHealth() {
+    private static void requestHealth() { requestHealth(false); }
+    private static void requestHealth(boolean retry) {
         if (!ready || closing || healthPending || (compatibility != CompatState.PROBING && compatibility != CompatState.VALIDATED)) return;
         if (queue.size() >= MAX_QUEUE) { fail("health queue overflow"); return; }
         healthPending = true;
@@ -422,6 +439,10 @@ public final class MiniBalanLink {
         healthVoltage = null;
         healthFrameAt = 0;
         healthToken++;
+        healthAttempt = retry ? 2 : 1;
+        healthEnqueuedAt = android.os.SystemClock.uptimeMillis();
+        healthSubmittedAt = -1;
+        healthWriteCompleteAt = -1;
         healthTx = new Tx(VOLTAGE_QUERY, false, false, null, true);
         // No partial frame preemption. Pending stop and latest movement retain
         // priority, followed by the one health query, then ordinary configuration.
@@ -429,17 +450,61 @@ public final class MiniBalanLink {
         while (!queue.isEmpty() && (queue.peekFirst().stop || queue.peekFirst().motion)) priority.add(queue.removeFirst());
         queue.addFirst(healthTx);
         for (int i = priority.size() - 1; i >= 0; i--) queue.addFirst(priority.get(i));
+        final long session = generation, token = healthToken;
+        LOOP.postDelayed(() -> {
+            if (current(session) && healthPending && healthToken == token && !healthSubmitted)
+                fail("health CMD7 queue timeout");
+        }, HEALTH_QUEUE_TIMEOUT_MS);
         pump();
     }
     private static void healthSubmitted(long requestNanos) {
         healthDecoder.reset();
         healthSubmittedNanos = requestNanos;
         healthSubmitted = true;
+        healthSubmittedAt = writeSubmittedAt;
         final long session = generation, token = healthToken;
-        Log.i(TAG, "health CMD7 submitted: token=" + token + " state=" + compatibility);
-        LOOP.postDelayed(() -> {
-            if (current(session) && healthPending && healthToken == token) fail("health CMD7 round-trip timeout");
-        }, HEALTH_QUERY_TIMEOUT_MS);
+        Log.i(TAG, "health CMD7 submitted: token=" + token + " state=" + compatibility + " " + healthMetadata());
+        LOOP.postDelayed(() -> healthQueryExpired(session, token), Math.max(0, HEALTH_QUERY_TIMEOUT_MS - elapsed(healthSubmittedAt)));
+    }
+    private static void healthQueryExpired(long session, long token) {
+        if (!current(session) || !healthPending || healthToken != token) return;
+        // Retry only a completed read-only write with no voltage proof. A stalled
+        // ATT operation still fails at 750ms; never overlap or retry that write.
+        if (operational && compatibility == CompatState.VALIDATED && healthAttempt == 1
+            && healthWriteDone && healthVoltage == null) {
+            Log.w(TAG, "health CMD7 missing; one bounded read-only retry: " + healthMetadata());
+            enterHealthRecovery();
+            queue.remove(healthTx);
+            healthPending = false;
+            healthSubmitted = false;
+            healthTx = null;
+            requestHealth(true);
+            return;
+        }
+        fail("health CMD7 round-trip timeout");
+    }
+    private static void enterHealthRecovery() {
+        if (healthRecovering || !operational || closing) return;
+        final long session = generation;
+        healthRecovering = true;
+        motionNeutralRequired = true;
+        Log.w(TAG, "health recovery: stop old motion; fresh neutral input required: " + healthMetadata());
+        // This invalidates both arming phases and the old latestMotion. The MCU
+        // 500ms watchdog is unchanged if a radio stall delays this best-effort zero.
+        halt();
+        showHealthNotice(false, session);
+    }
+    private static void showHealthNotice(boolean recovered, long session) {
+        if (!current(session) || !foreground || !operational || closing || context == null || ui.get() == null) return;
+        if (recovered ? healthRecovering || !motionNeutralRequired : !healthRecovering) return;
+        boolean chinese = "zh".equals(Locale.getDefault().getLanguage());
+        String message = recovered
+            ? (chinese ? "通信已恢复，请松开摇杆后重新操作" : "Communication restored. Release the joystick, then try again.")
+            : (chinese ? "通信恢复中，遥控已暂停" : "Restoring communication. Remote control is paused.");
+        if (recovered && gravityControl) message = chinese
+            ? "通信已恢复，请放平手机后重新操作" : "Communication restored. Level the phone, then try again.";
+        try { Toast.makeText(context, message, Toast.LENGTH_SHORT).show(); }
+        catch (RuntimeException error) { Log.w(TAG, "health notice unavailable: exception=" + error.getClass().getSimpleName()); }
     }
     private static void completeHealth() {
         if (!ready || closing || !healthPending || !healthSubmitted || !healthWriteDone || healthVoltage == null) return;
@@ -454,19 +519,30 @@ public final class MiniBalanLink {
         healthVoltage = null;
         healthTx = null;
         lastHealthValidAt = healthFrameAt;
+        boolean recovered = healthRecovering;
+        if (recovered) {
+            motionNeutralRequired = true;
+            gravityNeutralRequired = true;
+        }
+        healthRecovering = false;
         compatibility = CompatState.VALIDATED;
-        Log.i(TAG, "health round-trip verified: observed13=" + observed13 + " adapted13=" + adapted13);
+        Log.i(TAG, "health round-trip verified: observed13=" + observed13 + " adapted13=" + adapted13
+            + " enqueuedAt=" + healthEnqueuedAt + " submittedAt=" + healthSubmittedAt
+            + " receivedAt=" + healthFrameAt + " writeCompleteAt=" + healthWriteCompleteAt);
         if (initial) {
             startStartupNeutralBarrier(generation, gatt, voltage);
         }
         final long session = generation;
+        if (recovered) showHealthNotice(true, session);
         LOOP.postDelayed(() -> checkHealth(session), Math.max(0, HEALTH_INTERVAL_MS - age));
         LOOP.postDelayed(() -> checkHealth(session), Math.max(0, HEALTH_MAX_AGE_MS - age));
     }
     private static void checkHealth(long session) {
         if (!current(session) || !operational || closing || compatibility != CompatState.VALIDATED) return;
         long age = android.os.SystemClock.uptimeMillis() - lastHealthValidAt;
-        if (age >= HEALTH_MAX_AGE_MS) { fail("health voltage stale for 2500ms"); return; }
+        // Stale proof suspends movement; it cannot truncate a query's own bounded
+        // queue/submission window. A fresh voltage may still await a legal ATT callback.
+        if (age >= HEALTH_MAX_AGE_MS) enterHealthRecovery();
         if (age >= HEALTH_INTERVAL_MS && !healthPending) requestHealth();
     }
     private static boolean startupCurrent(long session, BluetoothGatt source, long token) {
@@ -557,9 +633,15 @@ public final class MiniBalanLink {
         run(() -> { if (control.get() == owner) { halt(); control.clear(); controlView.clear(); } });
     }
     public static void foreground(boolean value) {
-        run(() -> { foreground = value; if (!value) { DEBUG_AUTO.background(); halt(); } else DEBUG_AUTO.consider(); });
+        run(() -> { foreground = value; if (!value) { ManualBleScanner.cancel("background"); halt(); } });
     }
-    public static void release() { run(MiniBalanLink::halt); }
+    public static void release() {
+        run(() -> {
+            if (resettingControl) return;
+            if (!healthRecovering) motionNeutralRequired = false;
+            halt();
+        });
+    }
     public static void pageChanged() { release(); }
 
     public static boolean isControlOwner(ControlReset owner) { return owner != null && control.get() == owner; }
@@ -573,10 +655,13 @@ public final class MiniBalanLink {
      * after every ordinary zero sample. Return value preserves joystick indication.
      */
     public static int gravity(ControlReset owner, float x, float y) {
-        if (!isControlOwner(owner) || !gravityControl || !isReady() || !visible()) return -2;
+        if (resettingControl || !isControlOwner(owner) || !gravityControl || !isReady() || !visible() || healthRecovering) return -2;
         if (Float.isNaN(x) || Float.isNaN(y) || Float.isInfinite(x) || Float.isInfinite(y)) { halt(false); return -2; }
         if (gravityNeutralRequired) {
-            if (Math.abs(x) <= 3f && Math.abs(y) <= 3f) gravityNeutralRequired = false;
+            if (Math.abs(x) <= 3f && Math.abs(y) <= 3f) {
+                gravityNeutralRequired = false;
+                motionNeutralRequired = false;
+            }
             halt(false);
             return -2;
         }
@@ -590,9 +675,14 @@ public final class MiniBalanLink {
     public static void motion(ControlReset owner, int move, int turn) {
         final String frame = "CMD|3|" + Integer.signum(move) + "|" + Integer.signum(turn) + "|$";
         run(() -> {
-            if (!isControlOwner(owner)) return;
+            if (resettingControl || !isControlOwner(owner)) return;
             if (!isReady() || !visible()) { resetControl(); return; }
-            if (move == 0 && turn == 0) { halt(false); return; }
+            if (move == 0 && turn == 0) {
+                if (!healthRecovering) motionNeutralRequired = false;
+                halt(false);
+                return;
+            }
+            if (healthRecovering || motionNeutralRequired) { resetControl(); return; }
             latestMotion = frame;
             if (!heartbeat) {
                 heartbeat = true;
@@ -639,7 +729,10 @@ public final class MiniBalanLink {
         heartbeat = false; armPending = false; latestMotion = ZERO;
         if (requireNeutral) gravityNeutralRequired = true;
         ControlReset owner = control.get();
-        if (owner != null) owner.resetMotion();
+        if (owner != null && !resettingControl) {
+            resettingControl = true;
+            try { owner.resetMotion(); } finally { resettingControl = false; }
+        }
     }
     private static void halt() { halt(true); }
     private static void halt(boolean requireNeutral) {
@@ -713,9 +806,11 @@ public final class MiniBalanLink {
     private static long nextWriteAt;
     private static void pump() {
         if (!ready || gatt == null || waitingWrite || compatibility == CompatState.IDENTIFYING) return;
-        if (operational && compatibility == CompatState.VALIDATED
+        if (operational && compatibility == CompatState.VALIDATED && !healthRecovering
             && android.os.SystemClock.uptimeMillis() - lastHealthValidAt >= HEALTH_MAX_AGE_MS) {
-            fail("health voltage stale before next queued write"); return;
+            enterHealthRecovery();
+            // halt() can pump a zero reentrantly; never submit a second operation.
+            if (waitingWrite || !ready) return;
         }
         long wait = nextWriteAt - android.os.SystemClock.uptimeMillis();
         if (wait > 0) { LOOP.removeCallbacks(PUMP); LOOP.postDelayed(PUMP, wait); return; }
@@ -736,6 +831,8 @@ public final class MiniBalanLink {
         submittedWireLength = chunk.length;
         submittedFrameLength = active.bytes.length;
         long requestNanos = System.nanoTime();
+        writeSubmittedAt = android.os.SystemClock.uptimeMillis();
+        writeCallbackAt = -1;
         try {
             write.setWriteType(writeType);
             write.setValue(chunk);
@@ -743,13 +840,13 @@ public final class MiniBalanLink {
         } catch (RuntimeException e) { fail("GATT write denied: exception=" + e.getClass().getSimpleName() + " " + writeMetadata()); return; }
         if (active.health && active.offset == 0 && healthPending && active == healthTx) healthSubmitted(requestNanos);
         active.offset = end;
-        nextWriteAt = android.os.SystemClock.uptimeMillis() + WRITE_GAP_MS;
+        nextWriteAt = writeSubmittedAt + WRITE_GAP_MS;
         // Initial setup also waits for Android's completion callback in WWR mode.
         // This retains write type 1 but prevents exposing a failed initial write.
         if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT || !operational) {
             waitingWrite = true;
             final long session = generation, ticket = ++writeTicket;
-            LOOP.postDelayed(() -> { if (current(session) && waitingWrite && writeTicket == ticket) fail("GATT write timeout: " + writeMetadata()); }, WRITE_TIMEOUT_MS);
+            LOOP.postDelayed(() -> { if (current(session) && waitingWrite && writeTicket == ticket) fail("GATT write timeout: " + writeMetadata()); }, Math.max(0, WRITE_TIMEOUT_MS - elapsed(writeSubmittedAt)));
         } else {
             LOOP.removeCallbacks(PUMP);
             LOOP.postDelayed(PUMP, WRITE_GAP_MS);
@@ -761,7 +858,7 @@ public final class MiniBalanLink {
     public static void stop() {
         // A legacy sender that slept across session takeover must never close this GATT.
         if (LEGACY_DISPATCH.get() != null) return;
-        run(() -> { DEBUG_AUTO.cancel("user disconnect"); if (owned) { halt(); disconnectAfterStop(); } });
+        run(() -> { ManualBleScanner.cancel("user disconnect"); if (owned) { halt(); disconnectAfterStop(); } });
     }
     private static void disconnectAfterStop() {
         // Best effort zero is queued ahead of ordinary commands. The MCU watchdog
@@ -776,16 +873,16 @@ public final class MiniBalanLink {
         } else finish("user disconnect", 6);
     }
     public static void leaveForLegacy() {
-        run(() -> { DEBUG_AUTO.cancel("left MiniBalan"); if (owned) { halt(); closeGatt(); generation++; setOwned(false); } });
+        run(() -> { ManualBleScanner.cancel("left MiniBalan"); if (owned) { halt(); closeGatt(); generation++; setOwned(false); } });
     }
     public static void destroy() {
-        run(() -> { DEBUG_AUTO.cancel("destroy"); if (owned) { halt(); closeGatt(); generation++; setOwned(false); ui.clear(); } control.clear(); controlView.clear(); });
+        run(() -> { ManualBleScanner.cancel("destroy"); if (owned) { halt(); closeGatt(); generation++; setOwned(false); ui.clear(); } control.clear(); controlView.clear(); });
     }
     private static void fail(String reason) {
         finish(reason, closing || operational ? 6 : 4);
     }
     private static void finish(String reason, int event) {
-        Log.w(TAG, reason);
+        Log.w(TAG, reason + " session=" + generation + " " + healthMetadata() + " " + writeMetadata());
         closeGatt();
         final long session = ++generation;
         resetControl();
@@ -799,12 +896,16 @@ public final class MiniBalanLink {
         profileIndex = 0; profileRead = null; profileReadTicket++; observed13 = 0; adapted13 = 0;
         healthPending = false; healthSubmitted = false; healthWriteDone = false; healthVoltage = null;
         healthTx = null; healthToken++; healthSubmittedNanos = 0; lastHealthValidAt = 0; healthFrameAt = 0; healthReceiveAt = 0; healthDecoder.reset();
+        healthRecovering = false; motionNeutralRequired = false; healthAttempt = 0;
+        healthEnqueuedAt = -1; healthSubmittedAt = -1; healthWriteCompleteAt = -1; writeSubmittedAt = -1; writeCallbackAt = -1;
         queue.clear(); active = null; decoder.reset(); LOOP.removeCallbacks(PUMP);
         BluetoothGatt old = gatt;
         gatt = null; write = null; notify = null; cccd = null;
         if (old != null) {
-            try { old.disconnect(); } catch (RuntimeException ignored) { }
-            try { old.close(); } catch (RuntimeException ignored) { }
+            try { old.disconnect(); }
+            catch (RuntimeException error) { Log.w(TAG, "GATT disconnect cleanup failed: exception=" + error.getClass().getSimpleName()); }
+            try { old.close(); }
+            catch (RuntimeException error) { Log.w(TAG, "GATT close cleanup failed: exception=" + error.getClass().getSimpleName()); }
         }
     }
     private static boolean current(long session) { return owned && session == generation; }

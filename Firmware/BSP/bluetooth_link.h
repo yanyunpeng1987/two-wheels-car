@@ -52,7 +52,9 @@ typedef struct {
 } BtTxQueue;
 
 void bt_parser_reset(BtParser *parser);
-/* Returns one complete wire frame in parser->data, valid until next feed. */
+/* Returns one complete wire frame in parser->data, valid until next feed.
+   epoch stays stamped at the first byte, including across epoch transitions;
+   callers must enforce freshness for motion and parameter writes. */
 uint8_t bt_parser_feed(BtParser *parser, uint8_t byte, uint32_t received_cycles,
                        uint32_t epoch, uint32_t timeout_cycles);
 uint8_t bt_decode_command(const char *frame, BtCommand *command);

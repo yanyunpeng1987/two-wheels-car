@@ -112,6 +112,14 @@ static void reset(void)
     delivered_uart_errors = directions_at_irq = 0U;
     running_mode = 0U;
     flag_move = 1U;
+    modify = 0;
+    voltage = 11.5f;
+    velocity_left = -12.0f; velocity_right = 34.0f;
+    acceleration_y = 1.2f; gyro_turn = -3.4f; dis = 99U;
+    pidparams.middle_angle = -4.0f;
+    pidparams.balance_kp = 140; pidparams.balance_kd = 450;
+    pidparams.velocity_kp = 30; pidparams.velocity_ki = 80;
+    pidparams.turn_kp = 5; pidparams.turn_kd = 500;
     primask = 0U;
     test_dwt.CYCCNT = 0U;
     bluetooth_init();
@@ -317,11 +325,14 @@ static void test_silent_epoch_rearm(void)
     starts = rx_starts;
     at(500U); bluetooth_control_update(1U); assert(!blue_front);
     bluetooth_main_loop_task();
-    assert(rx_aborts == 1U && rx_starts == starts + 1U && rx_active && !dma.ht_enabled);
+    assert(rx_aborts == 0U && rx_starts == starts && rx_active && !dma.ht_enabled);
     assert(tx_aborts == 0U && tx_memory == held_tx);
     assert_tx("CMD|7|11500|$");
-    /* First fresh gesture works even if its zero and motion are one UART burst. */
+    /* Keep an old DMA arm intact for queries. Its protected frames remain old;
+       the app sends two separate neutral frames before permitting movement. */
     at(501U); receive("CMD|3|0|0|$CMD|3|1|-1|$"); process();
+    assert(!blue_front && !blue_left && bluetooth_epoch_rejected_frames == 2U);
+    at(601U); receive("CMD|3|0|0|$CMD|3|1|-1|$"); process();
     assert(blue_front && blue_left && flag_move == 1U && tx_aborts == 0U);
 
     /* An old partial parser cannot join a new epoch tail and unlock motion. */
@@ -332,8 +343,8 @@ static void test_silent_epoch_rearm(void)
     at(501U); receive("0|$CMD|3|1|0|$"); process(); assert(!blue_front);
     at(502U); receive("CMD|3|0|0|$CMD|3|1|0|$"); process(); assert(blue_front);
 
-    /* UART callback may already have armed and queued the current epoch.
-       Main must skip only the stale blocks, not flush the fresh zero/motion. */
+    /* Decode old blocks but reject their protected commands individually.
+       Freshly stamped zero/motion blocks queued later must still take effect. */
     reset();
     receive("CMD|3|0|0|$CMD|3|1|0|$"); process();
     at(499U); receive("CMD|3|0|0|$CMD|3|-1|0|$"); /* queue remains unread */
@@ -349,7 +360,9 @@ static void test_silent_epoch_rearm(void)
     receive("CMD|3|0|0|$CMD|3|1|0|$"); process(); assert(!blue_front);
     running_mode = 0U; bluetooth_control_update(1U); bluetooth_main_loop_task();
     receive("CMD|3|0|0|$CMD|3|-1|1|$"); process();
-    assert(blue_back && blue_right && rx_aborts == 2U && tx_aborts == 0U);
+    assert(!blue_back && !blue_right);
+    at(100U); receive("CMD|3|0|0|$CMD|3|-1|1|$"); process();
+    assert(blue_back && blue_right && rx_aborts == 0U && tx_aborts == 0U);
 
     bluetooth_uart_error_callback(&huart6);
     bluetooth_control_update(1U); assert(!blue_back);
@@ -357,17 +370,150 @@ static void test_silent_epoch_rearm(void)
     receive("CMD|3|0|0|$CMD|3|1|-1|$"); process();
     assert(blue_front && blue_left && flag_move == 1U);
 
-    /* An error IRQ while main aborts an obsolete arm wins over a normal re-arm. */
+    /* Epoch expiry never aborts RX. Real faults still abort/re-arm, including
+       another UART error arriving while the existing fault is being recovered. */
     reset();
     receive("CMD|3|0|0|$CMD|3|1|0|$"); process();
-    at(500U); bluetooth_control_update(1U);
+    at(500U); bluetooth_control_update(1U); bluetooth_main_loop_task();
+    assert(rx_active && rx_aborts == 0U && !blue_front);
+    bluetooth_uart_error_callback(&huart6);
     uart_error_during_rx_abort = 1U;
     bluetooth_main_loop_task();
-    assert(!rx_active && bluetooth_link_stats.rx_errors == 1U);
-    bluetooth_main_loop_task();
-    assert(rx_active && !dma.ht_enabled);
+    assert(rx_active && !dma.ht_enabled && rx_aborts == 1U);
+    assert(bluetooth_link_stats.rx_errors == 2U);
     at(501U); receive("CMD|3|0|0|$CMD|3|1|-1|$"); process();
     assert(blue_front && blue_left && flag_move == 1U);
+}
+
+static void test_service_commands_across_epoch(void)
+{
+    const char *queries[] = { "CMD|7|$", "CMD|8|$", "CMD|8|1|$" };
+    const char *responses[] = { "CMD|7|11500|$", "CMD|8|-4.0|140|30|5|450|80|500|$",
+                                 "CMD|8|-4.0|140|30|5|450|80|500|$" };
+    unsigned int q, after;
+    size_t split;
+    char prefix[BT_WIRE_MAX + 1U];
+    for (q = 0U; q < sizeof(queries) / sizeof(queries[0]); ++q) {
+        /* A: complete query queued before motion expiry, consumed after it. */
+        reset(); receive("CMD|3|0|0|$CMD|3|1|0|$"); process();
+        at(499U); receive(queries[q]);
+        at(500U); bluetooth_control_update(1U); process();
+        assert_tx(responses[q]);
+        assert(!blue_front && flag_move == 1U && rx_aborts == 0U);
+        assert(bluetooth_epoch_service_frames == 1U && bluetooth_link_stats.stale_frames == 0U);
+        /* B: the first query after expiry still completes an old DMA arm. */
+        reset(); receive("CMD|3|0|0|$"); process();
+        at(500U); bluetooth_control_update(1U); process();
+        at(501U); receive(queries[q]); process(); assert_tx(responses[q]);
+        assert(bluetooth_epoch_service_frames == 1U && rx_aborts == 0U);
+        /* C: every split straddles expiry and, separately, two DMA epochs. */
+        for (after = 0U; after < 2U; ++after) {
+            for (split = 1U; split < strlen(queries[q]); ++split) {
+                reset(); receive("CMD|3|0|0|$"); process();
+                if (after) { at(500U); bluetooth_control_update(1U); process(); }
+                memcpy(prefix, queries[q], split); prefix[split] = '\0';
+                at(after ? 501U : 499U); receive(prefix); process(); assert(!tx_active);
+                at(500U + after); bluetooth_control_update(1U); process();
+                at(after ? 502U : 501U); receive(queries[q] + split); process();
+                assert_tx(responses[q]);
+                assert(bluetooth_epoch_service_frames == 1U && !blue_front && rx_aborts == 0U);
+            }
+        }
+    }
+    /* D/E: already active TX survives; subsequent new-epoch query also works. */
+    reset(); receive("CMD|3|0|0|$"); process();
+    at(499U); receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    at(500U); bluetooth_control_update(1U); process(); assert_tx("CMD|7|11500|$");
+    assert(tx_aborts == 0U && rx_aborts == 0U);
+    tx_complete(); process();
+    at(501U); receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    tx_complete(); process();
+    at(502U); receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    assert(bluetooth_epoch_service_frames == 1U);
+    /* F: complete queued query is useful even when main was delayed by 500ms. */
+    reset(); receive("CMD|7|$"); at(500U); process(); assert_tx("CMD|7|11500|$");
+    assert(bluetooth_link_stats.stale_frames == 0U);
+    /* G: transport errors remain a real reset boundary; a new query can recover. */
+    reset(); receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    bluetooth_uart_error_callback(&huart6); process(); assert(!tx_active && tx_aborts == 1U);
+    receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    /* H: no armed motion means no expiry; ordinary idle queries remain usable. */
+    reset(); at(499U); receive("CMD|7|$");
+    at(500U); bluetooth_control_update(1U); process(); assert_tx("CMD|7|11500|$");
+    assert(bluetooth_epoch_service_frames == 0U);
+}
+
+static void test_epoch_subscriptions_and_protected_writes(void)
+{
+    PID_Params original;
+    reset(); receive("CMD|3|0|0|$"); process();
+    at(499U); receive("CMD|4|1|$CMD|5|1|$CMD|6|1|$");
+    at(500U); bluetooth_control_update(1U); process();
+    bluetooth_periodic_update(); assert_tx("CMD|4|34|-12|$");
+    tx_complete(); process(); assert_tx("CMD|5|99|$");
+    tx_complete(); process(); assert_tx("CMD|6|1.2|-3.4|$");
+    tx_complete(); process(); assert(!tx_active);
+    assert(bluetooth_epoch_service_frames == 3U);
+    at(501U); receive("CMD|4|0|$CMD|5|0|$CMD|6|0|$"); process();
+    at(600U); bluetooth_periodic_update(); assert(!tx_active);
+    assert(bluetooth_epoch_service_frames == 6U);
+
+    reset(); pidparams.middle_angle = -2.0f; original = pidparams;
+    receive("CMD|3|0|0|$"); process();
+    at(499U); receive("CMD|1|-9|$CMD|2|1|141|451|$CMD|8|2|$CMD|3|0|0|$CMD|3|1|0|$CMD|7|$");
+    at(500U); bluetooth_control_update(1U); process();
+    assert_tx("CMD|7|11500|$");
+    assert(memcmp(&pidparams, &original, sizeof(original)) == 0 && modify == 0);
+    assert(bluetooth_epoch_rejected_frames == 5U && bluetooth_link_stats.stale_frames == 5U);
+    assert(!blue_front && flag_move == 1U);
+    tx_complete(); process();
+    at(501U); receive("CMD|3|1|0|$"); process(); assert(!blue_front); /* old DMA arm */
+    at(502U); receive("CMD|3|1|0|$"); process(); assert(!blue_front); /* fresh, no zero */
+    at(503U); receive("CMD|3|0|0|$CMD|3|1|0|$CMD|1|-3|$CMD|2|1|141|451|$"); process();
+    assert(blue_front && modify == 1 && pidparams.middle_angle == -3.0f);
+    assert(pidparams.balance_kp == 141 && pidparams.balance_kd == 451);
+    modify = 0;
+    at(504U); receive("CMD|8|2|$"); process();
+    assert_tx("CMD|8|-4.0|140|30|5|450|80|500|$");
+    assert(modify == 0); /* Reset retains its original non-persistent contract. */
+
+    /* Age protection still applies without an epoch transition. */
+    reset(); original = pidparams;
+    receive("CMD|1|-9|$CMD|2|1|141|451|$CMD|8|2|$CMD|3|0|0|$CMD|7|$");
+    at(500U); process(); assert_tx("CMD|7|11500|$");
+    assert(memcmp(&pidparams, &original, sizeof(original)) == 0 && modify == 0);
+    assert(bluetooth_link_stats.stale_frames == 4U && bluetooth_epoch_rejected_frames == 0U);
+    receive("CMD|3|1|0|$"); process(); assert(!blue_front);
+}
+
+static void test_fragmented_old_writes_and_fault_reset(void)
+{
+    const char *writes[] = { "CMD|3|0|0|$", "CMD|3|1|0|$", "CMD|1|-9|$",
+                             "CMD|2|1|141|451|$", "CMD|8|2|$" };
+    unsigned int w;
+    size_t split;
+    char prefix[BT_WIRE_MAX + 1U];
+    PID_Params original;
+    for (w = 0U; w < sizeof(writes) / sizeof(writes[0]); ++w) {
+        for (split = 1U; split < strlen(writes[w]); ++split) {
+            reset(); pidparams.middle_angle = -2.0f; original = pidparams;
+            receive("CMD|3|0|0|$"); process();
+            at(500U); bluetooth_control_update(1U); process();
+            memcpy(prefix, writes[w], split); prefix[split] = '\0';
+            at(501U); receive(prefix); process(); /* first old DMA epoch */
+            at(502U); receive(writes[w] + split); process(); /* new DMA epoch */
+            assert(memcmp(&pidparams, &original, sizeof(original)) == 0 && modify == 0);
+            assert(bluetooth_epoch_rejected_frames == 1U && bluetooth_link_stats.stale_frames == 1U);
+            assert(!tx_active);
+            at(503U); receive("CMD|3|1|0|$"); process(); assert(!blue_front);
+            at(504U); receive("CMD|3|0|0|$CMD|3|1|0|$"); process(); assert(blue_front);
+        }
+    }
+    reset(); receive("CMD|7"); process();
+    bluetooth_uart_error_callback(&huart6); process();
+    receive("|$CMD|3|1|0|$"); process(); assert(!tx_active && !blue_front);
+    receive("CMD|7|$"); process(); assert_tx("CMD|7|11500|$");
+    assert(bluetooth_link_stats.rx_errors == 1U && rx_aborts == 1U);
 }
 
 int main(void)
@@ -378,6 +524,9 @@ int main(void)
     test_fragmentation_and_invalid();
     test_irq_snapshot();
     test_silent_epoch_rearm();
-    puts("bluetooth_adapter: actual HAL bridge, DMA ownership, RX faults and motion guard passed");
+    test_service_commands_across_epoch();
+    test_epoch_subscriptions_and_protected_writes();
+    test_fragmented_old_writes_and_fault_reset();
+    puts("bluetooth_adapter: HAL bridge, DMA/RX faults, motion guard, 8 query-boundary scenarios and protected-write splits passed");
     return 0;
 }

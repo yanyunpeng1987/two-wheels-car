@@ -44,6 +44,9 @@ typedef struct {
     uint32_t tx_errors;
 } BluetoothLinkStats;
 extern volatile BluetoothLinkStats bluetooth_link_stats;
+/* Motion-epoch rejects are also counted in stale_frames; service frames are kept. */
+extern volatile uint32_t bluetooth_epoch_rejected_frames;
+extern volatile uint32_t bluetooth_epoch_service_frames;
 #define DEBUG_PRINT_BUFFER_SIZE     256
 
 

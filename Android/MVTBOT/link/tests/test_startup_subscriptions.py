@@ -135,12 +135,11 @@ int main(int argc, char **argv) {
                     data = '\n'.join(f'{at + (offset if wire.startswith(("CMD|4|", "CMD|5|", "CMD|6|")) else 0)} {wire}' for at,wire in rows)+'\n'
                     result = run([exe,str(before),str(delay)],repo,data).strip()
                     reporting = list(map(int,result.split()[1:4]))
-                    expected = [0,1,0] if name == 'legacy_boundary' else [1,1,0]
-                    strict = name in ('legacy_boundary', 'cb60') or (name == 'cb180' and offset == 0)
-                    if strict and reporting != expected:
+                    # Safe subscriptions now survive motion epoch changes, including
+                    # the former silent-drop regression and slower delivery offsets.
+                    expected = [1,1,0]
+                    if reporting != expected:
                         raise AssertionError(f'{name}/{before}/{offset}/{delay}: {result}, expected {expected}')
-                    if name == 'legacy_boundary' and not result.endswith('STALE 0 INVALID 0'):
-                        raise AssertionError('negative fixture did not exercise the silent epoch block discard')
                     results.append({'scenario':name,'mainBeforeRx':bool(before),'uartOffsetMs':offset,
                                     'dispatchDelayMs':delay,'reporting':reporting,'expected':expected,
                                     'subscriptionComplete':reporting==[1,1,0],'result':result})
@@ -149,7 +148,7 @@ int main(int argc, char **argv) {
               'limitations':['Host scheduling model; no radio/vehicle validation','450ms response cases are observations, not continuous-motion acceptance']}
     (output/'report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     incomplete=[r for r in results if r['scenario']!='legacy_boundary' and not r['subscriptionComplete']]
-    print(f'Startup subscription replay: PASS ({len(results)} schedules; legacy silent-drop reproduced; 60ms and 180ms/no-added-delivery-delay all [1,1,0]; slow-edge incomplete={len(incomplete)}; {report["java"]})')
+    print(f'Startup subscription replay: PASS ({len(results)} schedules; former epoch-drop and all subscription schedules now [1,1,0]; incomplete={len(incomplete)}; {report["java"]})')
     for result in incomplete:
         print('LIMITATION', result)
 

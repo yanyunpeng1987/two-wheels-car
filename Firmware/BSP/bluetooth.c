@@ -25,7 +25,6 @@ static BtRxBlock rx_blocks[BT_RX_SLOTS];
 static volatile uint32_t rx_write;
 static volatile uint32_t rx_read;
 static volatile uint8_t rx_recovery;
-static volatile uint8_t rx_paused;
 static uint8_t callbacks_ready;
 static BtParser parser;
 static volatile BtMotionGuard motion;
@@ -40,6 +39,9 @@ static uint8_t reporting[BT_TELEMETRY_SLOTS];
 bool enable_bluetooth_output = true;
 int datw;
 volatile BluetoothLinkStats bluetooth_link_stats;
+/* Separate counters retain the existing BluetoothLinkStats layout. */
+volatile uint32_t bluetooth_epoch_rejected_frames;
+volatile uint32_t bluetooth_epoch_service_frames;
 /* Retain the existing diagnostic ABI; these are not part of the wire format. */
 volatile LogMessage g_log_ring_buffer[LOG_BUFFER_COUNT];
 volatile uint16_t g_log_write_index;
@@ -78,28 +80,6 @@ static uint8_t start_receive(uint8_t index)
     return 1U;
 }
 
-static void synchronize_receive_epoch(void)
-{
-    uint32_t previous = lock_interrupts();
-    if (parser.length != 0U && parser.epoch != motion.epoch) bt_parser_reset(&parser);
-    if (rx_recovery != 0U || rx_dma_epoch == motion.epoch) {
-        __set_PRIMASK(previous);
-        return;
-    }
-    /* Main-loop only: discard an old DMA arm during silence, without touching TX.
-       Already queued blocks retain their epochs and are filtered individually. */
-    rx_paused = 1U;
-    __set_PRIMASK(previous);
-    if (HAL_UART_AbortReceive(&huart6) != HAL_OK) {
-        ++bluetooth_link_stats.rx_restart_errors;
-        receive_fault();
-    }
-    previous = lock_interrupts();
-    if (rx_recovery == 0U) (void)start_receive(0U);
-    rx_paused = 0U;
-    __set_PRIMASK(previous);
-}
-
 static uint8_t register_callbacks(void)
 {
     if (callbacks_ready != 0U) return 1U;
@@ -117,6 +97,7 @@ static uint8_t register_callbacks(void)
 void bluetooth_init(void)
 {
     memset((void *)&bluetooth_link_stats, 0, sizeof(bluetooth_link_stats));
+    bluetooth_epoch_rejected_frames = bluetooth_epoch_service_frames = 0U;
     memset(reporting, 0, sizeof(reporting));
     bt_parser_reset(&parser);
     bt_tx_init(&tx_queue);
@@ -124,7 +105,6 @@ void bluetooth_init(void)
                   (uint8_t)(running_mode == Normal_Mode));
     rx_write = rx_read = 0U;
     rx_recovery = tx_done = tx_started = tx_pending = 0U;
-    rx_paused = 0U;
     callbacks_ready = 0U;
     last_periodic_cycles = DWT->CYCCNT;
     if (!register_callbacks()) return;
@@ -140,7 +120,7 @@ void bluetooth_dma_rx_callback(UART_HandleTypeDef *huart, uint16_t size)
     if (huart->Instance != USART6) return;
     event = HAL_UARTEx_GetRxEventType(huart);
     if (event == HAL_UART_RXEVENT_HT) return;
-    if (rx_recovery != 0U || rx_paused != 0U) return;
+    if (rx_recovery != 0U) return;
     if ((event != HAL_UART_RXEVENT_IDLE && event != HAL_UART_RXEVENT_TC) ||
         size == 0U || size > BT_WIRE_MAX) {
         ++bluetooth_link_stats.rx_errors;
@@ -241,38 +221,41 @@ static void service_transmit(void)
 static void process_command(uint32_t last_cycles)
 {
     BtCommand command;
+    PID_Params snapshot;
     char response[BT_WIRE_MAX + 1U];
     int length = 0;
     uint32_t previous;
+    uint8_t service_command;
     if (!bt_decode_command(parser.data, &command)) {
         ++bluetooth_link_stats.invalid_frames;
         return;
     }
+    /* Motion expiry does not invalidate reads or telemetry subscriptions.
+       CMD8 reset is a PID write and must pass the same freshness gate as CMD1/2/3. */
+    service_command = (uint8_t)((command.code >= 4U && command.code <= 7U) ||
+                               (command.code == 8U && command.args[0] == 1));
     previous = lock_interrupts();
     bt_guard_tick(&motion, DWT->CYCCNT, (uint8_t)(running_mode == Normal_Mode));
-    if (parser.epoch != motion.epoch || rx_recovery != 0U ||
-        (uint32_t)(DWT->CYCCNT - parser.first_cycles) >= motion.timeout_cycles) {
-        __set_PRIMASK(previous);
+    if (rx_recovery != 0U ||
+        (service_command == 0U &&
+         (parser.epoch != motion.epoch ||
+          (uint32_t)(DWT->CYCCNT - parser.first_cycles) >= motion.timeout_cycles))) {
+        if (service_command == 0U && parser.epoch != motion.epoch)
+            ++bluetooth_epoch_rejected_frames;
         ++bluetooth_link_stats.stale_frames;
-        return;
-    }
-    if (command.code == 3U) {
-        /* The neutral transition cannot be overwritten by a following command. */
-        (void)bt_guard_receive(&motion, command.args[0], command.args[1],
-                               parser.first_cycles, last_cycles, parser.epoch, DWT->CYCCNT);
         __set_PRIMASK(previous);
         return;
     }
-    __set_PRIMASK(previous);
+    if (service_command != 0U && parser.epoch != motion.epoch)
+        ++bluetooth_epoch_service_frames;
+    /* Commit protected changes under the same lock as their freshness check.
+       A control/UART IRQ cannot invalidate the epoch between check and write. */
     switch (command.code) {
     case 1:
-        previous = lock_interrupts();
         pidparams.middle_angle = command.decimal;
         modify = 1;
-        __set_PRIMASK(previous);
         break;
     case 2:
-        previous = lock_interrupts();
         if (command.args[0] == 1) {
             pidparams.balance_kp = command.args[1];
             pidparams.balance_kd = command.args[2];
@@ -284,8 +267,28 @@ static void process_command(uint32_t last_cycles)
             pidparams.turn_kd = command.args[2];
         }
         modify = 1;
-        __set_PRIMASK(previous);
         break;
+    case 3:
+        (void)bt_guard_receive(&motion, command.args[0], command.args[1],
+                               parser.first_cycles, last_cycles, parser.epoch, DWT->CYCCNT);
+        break;
+    case 8:
+        if (command.args[0] == 2) {
+            pidparams.middle_angle = -4.0f;
+            pidparams.balance_kp = 140;
+            pidparams.balance_kd = 450;
+            pidparams.velocity_kp = 30;
+            pidparams.velocity_ki = 80;
+            pidparams.turn_kp = 5;
+            pidparams.turn_kd = 500;
+            /* Preserve the previous reset command's non-persistent behavior. */
+        }
+        snapshot = pidparams;
+        break;
+    default: break;
+    }
+    __set_PRIMASK(previous);
+    switch (command.code) {
     case 4: case 5: case 6:
         reporting[command.code - 4U] = (uint8_t)command.args[0];
         if (command.args[0] == 0) tx_queue.telemetry[command.code - 4U].length = 0U;
@@ -299,25 +302,9 @@ static void process_command(uint32_t last_cycles)
         }
         break;
     case 8:
-        {
-            PID_Params snapshot;
-            previous = lock_interrupts();
-            if (command.args[0] == 2) {
-                pidparams.middle_angle = -4.0f;
-                pidparams.balance_kp = 140;
-                pidparams.balance_kd = 450;
-                pidparams.velocity_kp = 30;
-                pidparams.velocity_ki = 80;
-                pidparams.turn_kp = 5;
-                pidparams.turn_kd = 500;
-                /* Preserve the previous reset command's non-persistent behavior. */
-            }
-            snapshot = pidparams;
-            __set_PRIMASK(previous);
-            length = snprintf(response, sizeof(response), "CMD|8|%.1f|%d|%d|%d|%d|%d|%d|$",
-                              snapshot.middle_angle, snapshot.balance_kp, snapshot.velocity_kp,
-                              snapshot.turn_kp, snapshot.balance_kd, snapshot.velocity_ki, snapshot.turn_kd);
-        }
+        length = snprintf(response, sizeof(response), "CMD|8|%.1f|%d|%d|%d|%d|%d|%d|$",
+                          snapshot.middle_angle, snapshot.balance_kp, snapshot.velocity_kp,
+                          snapshot.turn_kp, snapshot.balance_kd, snapshot.velocity_ki, snapshot.turn_kd);
         break;
     default: break;
     }
@@ -342,7 +329,8 @@ void bluetooth_main_loop_task(void)
         bt_tx_init(&tx_queue);
         if (register_callbacks()) (void)start_receive(0U);
     }
-    synchronize_receive_epoch();
+    /* A motion epoch is not a UART session reset. Keep old DMA blocks/partial
+       frames for read-only queries; protected commands retain their first epoch. */
     while (budget-- != 0U && rx_recovery == 0U) {
         unsigned int i;
         previous = lock_interrupts();
@@ -352,10 +340,6 @@ void bluetooth_main_loop_task(void)
         }
         block = rx_blocks[rx_read % BT_RX_SLOTS];
         ++rx_read;
-        if (block.epoch != motion.epoch) {
-            __set_PRIMASK(previous);
-            continue;
-        }
         __set_PRIMASK(previous);
         for (i = 0U; i < block.length; ++i) {
             if (bt_parser_feed(&parser, block.data[i], block.cycles,

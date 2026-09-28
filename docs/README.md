@@ -10,6 +10,7 @@
 | [HC-05D现场验证记录](HC05D_DEVICE_VALIDATION_20260924.md) | 手机安装、固件回读、PID保护及模块写入异常的实际证据 |
 | [HC-05D下次现场检查](HC05D_NEXT_BENCH_TEST.md) | 已安装组合、自动连接行为及待本人在场进行的联动/失联检查 |
 | [HC-05D断连与重连调查](HC05D_DISCONNECT_INVESTIGATION_20260928.md) | 9月28日手机主动断连记录、健康截止/扫描/MCU查询回放及下一版取消自动连接要求 |
+| [HC-05D断连修复交付](HC05D_RECONNECT_FIX_20260928.md) | v38手动扫描与有界健康恢复、MCU查询修复、临时SPD门限及待实物验证的成品 |
 | [9月28日自稳倒下记录](FALL_CAPTURE_20260928.md) | 冻结的右编码器94计数/SPD首因、Flash及滤波配置核验、后续边界 |
 | [HC-05D兼容与验证](HC05D_COMPATIBILITY.md) | 模块配置、APK/MCU实现、失联契约、构建与实物验收 |
 | [通信协议基线](PROTOCOL.md) | 当前源码行为、传输边界与两端变更约定 |

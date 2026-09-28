@@ -64,6 +64,7 @@ jobs:
           python3 Android/MVTBOT/link/tests/test_ble_session.py --java-home "$JAVA_HOME"
           python3 Android/MVTBOT/link/tests/test_health_recovery.py --java-home "$JAVA_HOME"
           python3 Android/MVTBOT/link/tests/test_manual_scanner.py --java-home "$JAVA_HOME"
+          python3 Android/MVTBOT/link/tests/test_manual_permissions.py --java-home "$JAVA_HOME"
           python3 Android/MVTBOT/link/tests/test_cross_stack_rearm.py --java-home "$JAVA_HOME" --cc gcc
           python3 Android/MVTBOT/link/tests/test_startup_subscriptions.py --java-home "$JAVA_HOME" --cc gcc
           python3 Android/MVTBOT/link/tests/test_dex_roundtrip.py

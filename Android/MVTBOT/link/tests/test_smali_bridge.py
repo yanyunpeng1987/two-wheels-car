@@ -75,6 +75,24 @@ def check_picker_roundtrip(reference, decoded):
     print('Real APK picker roundtrip: PASS (full class/method bodies, annotation placement, executable mutation rejected)')
 
 
+def check_manual_permissions(root, reference, ui_fixed):
+    relative = patch.BASE + 'MainActivity.smali'
+    text = (root / relative).read_text(encoding='utf-8')
+    original = (reference / relative).read_text(encoding='utf-8')
+    clicked = patch.find_method(text, 'onClick(Landroid/view/View;)V')
+    assert 'PermissionUtils;->mayRequestLocation' not in clicked
+    assert clicked.index('->mvtbotManualBlePermissions(') < clicked.index('SearchDeviceDialog;->createDialog(')
+    gate = patch.find_method(text, 'mvtbotManualBlePermissions(Landroid/app/Activity;)Z')
+    assert gate.index('->mvtbotMiniSelected()Z') < gate.index('if-eqz v0, :link_legacy') < gate.index('ManualBlePermissions;->ensure(') < gate.index('\n    :link_legacy\n') < gate.index('PermissionUtils;->mayRequestLocation(')
+    created = patch.find_method(text, 'onCreate(Landroid/os/Bundle;)V')
+    assert ('PermissionUtils;->mayRequestLocation(' not in created) == ui_fixed, 'only fixed Mini UI removes startup permission request'
+    assert 'ManualBlePermissions' not in created and 'mvtbotManualBlePermissions' not in created
+    callback = 'onRequestPermissionsResult(I[Ljava/lang/String;[I)V'
+    assert patch.find_method(text, callback) == patch.find_method(original, callback), 'permission completion must not auto-open picker'
+    assert '->mvtbotPauseLink()V' in patch.find_method(text, 'onPause()V')
+    assert '->foreground(Z)V' in patch.find_method(text, 'mvtbotPauseLink()V'), 'real background cleanup remains'
+
+
 def replay_ui(data, edit):
     text = patch.canonical_text(data)
     assert patch.line_hash_matches(text, edit['beforeSha256'])
@@ -119,6 +137,7 @@ def combined_replay(reference):
                 file.write_bytes(data)
             record = patch.apply(root, ui_path)
             check_manual_picker(root, reference)
+            check_manual_permissions(root, reference, True)
             assert record['ui_profile']['source_commit'] == 'aa000240b183a8daeed3f09ca084cdf9335e0076'
             assert patch.apply(root, ui_path) == record
             verifier.check_smali(root)
@@ -175,6 +194,7 @@ def main():
             shutil.copyfile(reference / relative, target)
         record = patch.apply(root)
         check_manual_picker(root, reference)
+        check_manual_permissions(root, reference, False)
         assert patch.apply(root) == record
         manager = (root / patch.BASE / 'BluetoothConnect/BLEManager.smali').read_text()
         main = (root / patch.BASE / 'MainActivity.smali').read_text()

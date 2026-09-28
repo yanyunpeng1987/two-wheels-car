@@ -2,12 +2,13 @@
 
 此目录是“两轮自平衡小车”的 Android 开发资料入口，2026-09-24 从“提取 Wonderbot APK”任务汇总。设备端继续使用仓库根目录的 `Firmware/`。
 
-**不可变输入基线：MVTBOT 2.3.6-mvtbot.2，versionCode 21。** 当前 LINK-001 默认构建为 HC-05D BLE 版 `2.3.6-mvtbot.11-hc05d (38)`，保留另一任务的 APP-UI-001 界面改动、原包名和证书。v38 已完成本地构建与成品校验，**待安装实测**；启动自动连接已完全移除，现代手动扫描及健康查询恢复已实现。当前产物、配对和验证边界以[蓝牙重连修复报告](../../docs/HC05D_RECONNECT_FIX_20260928.md)为准。历史 NUL 上游来源仍未确认，v36 手机证据保留在[2026-09-24现场记录](../../docs/HC05D_DEVICE_VALIDATION_20260924.md)。
+**不可变输入基线：MVTBOT 2.3.6-mvtbot.2，versionCode 21。** 当前 LINK-001 默认构建为 HC-05D BLE 版 `2.3.6-mvtbot.12-hc05d (39)`，保留另一任务的 APP-UI-001 界面改动、原包名和证书。v39 **已覆盖安装并回拉核验**，修复已授权仍重复请求权限导致手动扫描立即停止的问题；用户已选择本车并反馈连接、功能正常，短时日志未见崩溃。长时及受控运动验收尚未完成，当前产物、配对和证据以[部署记录](../../docs/HC05D_DEPLOYMENT_20260928.md)为准。历史 NUL 上游来源仍未确认，v36 手机证据保留在[2026-09-24现场记录](../../docs/HC05D_DEVICE_VALIDATION_20260924.md)。
 
 ## 从这里开始
 
 - [开发交接与当前结论](docs/HANDOFF.md)
-- [v38 蓝牙重连修复与验证边界](../../docs/HC05D_RECONNECT_FIX_20260928.md)
+- [v39 部署、权限修复与验证边界](../../docs/HC05D_DEPLOYMENT_20260928.md)
+- [v38 蓝牙重连修复的构建记录](../../docs/HC05D_RECONNECT_FIX_20260928.md)
 - [APP 与设备端协同入口](docs/PROTOCOL_COORDINATION.md)
 - [原始崩溃分析与三次复现证据](materials/deliverables/MVTBOT/diagnostics-20260916/原因分析.md)
 - [Android 工具环境记录](materials/deliverables/Android_Development_Environment/环境检查与使用说明.md)
@@ -76,20 +77,24 @@ python Android/MVTBOT/tools/Verify-Import.py --include-project
 
 `project/` 是派生的本地重建目录，Git clone 或新 worktree 不包含它与 `materials/`。APK 工作开始前须从完整归档恢复本地材料并核验；仅克隆仓库无法重建 APK。
 
-业务改动遵循[变更管理约定](changes/README.md)。LINK-001 用自有 Java + 最小 smali 桥接，在快照中重建主 DEX和辅助 DEX，classes2/3 保持原样；最终检查方法签名、类唯一性和 APK 载荷。JADX 仍只供阅读，不能当成完整可构建工程。`-BaselineOnly` 重建原 v21；`-RollbackUiOnly` 当前默认输出 versionCode 39，保留新界面、旧通信逻辑及同一签名。该参数默认值不代表 v39 已构建或安装，回退还须按实际在机版本与配套固件核验。
+业务改动遵循[变更管理约定](changes/README.md)。LINK-001 用自有 Java + 最小 smali 桥接，在快照中重建主 DEX和辅助 DEX，classes2/3 保持原样；最终检查方法签名、类唯一性和 APK 载荷。JADX 仍只供阅读，不能当成完整可构建工程。`-BaselineOnly` 重建原 v21；`-RollbackUiOnly` 当前默认输出 versionCode 40，保留新界面、旧通信逻辑及同一签名。v40 仅为参数默认值，尚未构建；回退还须按实际在机版本与配套固件核验。
 
 私钥及 DPAPI 密文仍位于 `%LOCALAPPDATA%\Android\Signing\MVTBOT`，不在本项目中。迁移到其他 Windows 账户前需要单独规划签名备份；仅复制 DPAPI 密文不能保证可用。
 
-用户已要求与APP-UI-001合并。默认v38同时包含新界面和HC-05D通信；保留原UI补丁的来源与验收，不以旧v22或v36手机记录代替新组合包实测。最终成品重新解码核验UI规则及全部主DEX类。
+用户已要求与APP-UI-001合并。默认v39同时包含新界面和HC-05D通信；保留原UI补丁的来源与验收，不以旧v22或v36手机记录代替新组合包实测。最终成品重新解码核验UI规则及全部主DEX类。
 
-## 当前 v38 构建产物
+## 当前 v39 安装产物
 
-产物为 `build/combined-ui-hc05d-v38-reconnect-r2/MVTBOT.apk`，SHA-256 `87ac15c758715f7a00bf786c25f21174dbc2a61618a973225cca4692daec174e`。已通过同签名、DEX/全部主类、资源及16KB对齐校验；尚未安装，不作为手机或整车验收证据。
+产物为 `build/combined-ui-hc05d-v39-permissions-r1/MVTBOT.apk`，SHA-256 `1dd233c87241feadc6ebf62a374865da1fd22cad5d5ec589cec7ab8429eac153`。已通过同签名、DEX/全部主类、资源及16KB对齐校验，覆盖安装后的回拉APK哈希一致，应用数据保留。
 
-v38 不含 `DebugAutoConnect` 类或自动连接目标 asset，构建入口也已移除该选项。用户打开手动列表后才启动一次最长10秒扫描，关闭、选中、外部取消、后台及销毁都会停止；失败有明确提示与有界冷却，不自动重试。健康恢复期间暂停旧运动，恢复后需要新的松手或回中；具体时间预算、主机回归及现场待测项目见[修复报告](../../docs/HC05D_RECONNECT_FIX_20260928.md)。
+自 v38 起已移除 `DebugAutoConnect` 类、目标asset和构建选项。v39 启动不自动扫描，也不主动请求Mini蓝牙权限；用户点击时先检查权限，Android12及以上只需SCAN/CONNECT，已授权不再请求，缺项授权后需再次点击。已授权手动扫描、10秒截止及选中本车后的通信已实测，完整反复重连、权限拒绝、长时和受控运动验收仍待完成。
+
+v38 r2（SHA-256 `87ac15c758715f7a00bf786c25f21174dbc2a61618a973225cca4692daec174e`）曾于本次现场安装，暴露旧权限入口触发后台清理的问题，已由v39替换；其构建证据保留，不代表当时手动扫描可用。健康恢复期间暂停旧运动并要求新的松手或回中，具体预算及实现见[修复报告](../../docs/HC05D_RECONNECT_FIX_20260928.md)，实际部署结果见[部署记录](../../docs/HC05D_DEPLOYMENT_20260928.md)。
+
+APP-UI-004“联系我们显示实际APK版本”已列入下次更新，本次v39未实现。
 
 ## 2026-09-24 v36 历史排查包
 
 2026-09-24已安装v36诊断包（版本名追加`-diag`），SHA-256 `699aeba6d2d799f3757619b40e34bb28891b053887726905a70c6b0396124428`。启动后按本机配置扫描已确认的目标，实际约7秒进入通信就绪，速度/距离/电压/PID回读/波形有手机证据；联动控制和完整失联验收留待用户现场进行。结束本轮时已停止手机APP的主动连接。
 
-当时的自动连接仅在显式提供`-DebugAutoConnectTarget`时启用，地址只存在输出快照的`assets/mvtbot-debug-autoconnect.properties`，未写入源码或原v21输入；前台稳定500ms后尝试一次最长10秒的精确地址扫描。这是已归档 v36 的历史行为，当前 v38 已删除该实现和构建选项，不应再沿用旧命令。
+当时的自动连接仅在显式提供`-DebugAutoConnectTarget`时启用，地址只存在输出快照的`assets/mvtbot-debug-autoconnect.properties`，未写入源码或原v21输入；前台稳定500ms后尝试一次最长10秒的精确地址扫描。这是已归档 v36 的历史行为，自v38起已删除该实现和构建选项，不应再沿用旧命令。

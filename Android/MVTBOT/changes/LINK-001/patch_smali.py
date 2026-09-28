@@ -18,7 +18,7 @@ MAN = "Lcom/Wonder/bot/BluetoothConnect/BLEManager;"
 MAIN = "Lcom/Wonder/bot/MainActivity;"
 CTRL = "Lcom/Wonder/bot/fragment/MiniBalan/BalanceCarControlFragment;"
 MARKER = ".mvtbot-link-001.json"
-PATCH_VERSION = 4
+PATCH_VERSION = 5
 UI_COMMIT = "aa000240b183a8daeed3f09ca084cdf9335e0076"
 UI_PATCH_SHA256 = "953db3d574a712fa707e11ba192c28d59f3758f8c80f3a2808016a423e9e1eef"
 
@@ -252,6 +252,16 @@ def transform(relative, text, ui_fixed=False):
     return v0
 """)
     elif relative == BASE + "MainActivity.smali":
+        permission = "    invoke-static {p0}, Lcom/Wonder/bot/utils/PermissionUtils;->mayRequestLocation(Landroid/app/Activity;)Z"
+        clicked = find_method(text, "onClick(Landroid/view/View;)V")
+        text = replace_once(text, clicked, replace_once(clicked, permission,
+                            f"    invoke-static {{p0}}, {MAIN}->mvtbotManualBlePermissions(Landroid/app/Activity;)Z"))
+        if ui_fixed:
+            # This reviewed UI composition always selects MiniBalan, but that
+            # selection occurs after this onCreate location-permission call.
+            # Request only from the user's Bluetooth click, never from startup.
+            created = find_method(text, "onCreate(Landroid/os/Bundle;)V")
+            text = replace_once(text, created, replace_once(created, permission, ""))
         anchor = f"    iput-object v0, p0, {MAIN}->mHandler:Landroid/os/Handler;"
         text = replace_once(text, anchor, anchor + f"\n\n    invoke-static {{p0, v0}}, {LINK}->bind(Landroid/content/Context;Landroid/os/Handler;)V")
         text = prepend(text, "onPause()V", f"    invoke-static {{}}, {LINK}->release()V\n    invoke-static {{}}, {MAIN}->mvtbotPauseLink()V")
@@ -365,6 +375,20 @@ def transform(relative, text, ui_fixed=False):
     const/4 v0, 0x0
     invoke-static {{v0}}, {LINK}->foreground(Z)V
     return-void
+.end method
+
+.method private static mvtbotManualBlePermissions(Landroid/app/Activity;)Z
+    .locals 1
+    invoke-static {{}}, {MAIN}->mvtbotMiniSelected()Z
+    move-result v0
+    if-eqz v0, :link_legacy
+    invoke-static {{p0}}, Lcom/mvtbot/link/ManualBlePermissions;->ensure(Landroid/app/Activity;)Z
+    move-result v0
+    return v0
+    :link_legacy
+    invoke-static {{p0}}, Lcom/Wonder/bot/utils/PermissionUtils;->mayRequestLocation(Landroid/app/Activity;)Z
+    move-result v0
+    return v0
 .end method
 """
     elif relative == BASE + "fragment/MiniBalan/BalanceCarControlFragment.smali":

@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 
 STUBS = {
+"android/os/Build.java": '''package android.os;public class Build{public static class VERSION{public static int SDK_INT=36;}}''',
+"android/app/Activity.java": '''package android.app;import java.util.*;public class Activity extends android.content.Context{public final Set<String> granted=new HashSet<>();public final List<String> checked=new ArrayList<>();public final List<String[]> requested=new ArrayList<>();public boolean checkDenied,requestDenied,grantOnRequest;public int requestCode;public Runnable onRequest;public int checkSelfPermission(String permission){if(checkDenied)throw new SecurityException();checked.add(permission);return granted.contains(permission)?0:-1;}public void requestPermissions(String[] permissions,int code){if(requestDenied)throw new SecurityException();requested.add(permissions.clone());requestCode=code;if(grantOnRequest)granted.addAll(Arrays.asList(permissions));if(onRequest!=null)onRequest.run();}}''',
 "android/os/Looper.java": '''package android.os; public class Looper { static final Looper MAIN=new Looper(); public static Looper getMainLooper(){return MAIN;} public static Looper myLooper(){return MAIN;} }''',
 "android/os/Message.java": '''package android.os; public class Message { public int what,arg1,arg2; public Object obj; public void recycle(){} }''',
 "android/os/Handler.java": '''package android.os;

@@ -4,6 +4,17 @@ This change keeps the v21 UI and takes over BLE only when the user explicitly
 selects MiniBalan. It does not add Classic Bluetooth/SPP, automatically connect
 to scan results, or identify a product from its advertised name.
 
+Current installed release: **v39 / 2.3.6-mvtbot.12-hc05d**, built in
+`../../build/combined-ui-hc05d-v39-permissions-r1/`, APK SHA-256
+`1dd233c87241feadc6ebf62a374865da1fd22cad5d5ec589cec7ab8429eac153`.
+The installed APK was pulled back and verified. The user selected the vehicle
+and reported normal connection/functions; logs from 14:06:13 to 14:07:29 show
+operational telemetry without fatal errors. This is not long-duration or
+controlled-motion acceptance. See [deployment evidence](../../../../docs/HC05D_DEPLOYMENT_20260928.md).
+v38's installed permission regression remains historical evidence; v39 fixes it.
+APP-UI-001 remains included. APP-UI-004 (actual version in Contact) is deferred;
+v39 does not implement it. UI-only rollback 40 is an unbuilt parameter default.
+
 ## Build inputs
 
 - `../../link/src/com/mvtbot/link/`: maintained Java, compiled against Android
@@ -214,6 +225,16 @@ The v36 diagnostic auto-connect helper and target asset were removed at the
 user's request. Current packaging rejects the old asset and any residual helper
 class. No scan or connection starts just from launching/resuming MiniBalan.
 
+v39 adds `ManualBlePermissions` at the Mini Bluetooth button. Android 12+
+requires only SCAN/CONNECT; Android 6-11 requires Fine location, and older APIs
+make no runtime request. Already granted permissions cause no request. Only
+missing permissions are requested, and that click always returns false, even
+if the grant is immediate. Permission callbacks do not start a scan; the user
+clicks again. The fixed Mini UI omits the old startup request before robot
+selection is initialized; other robot permission routes remain unchanged.
+Real Activity pause still stops scanning and movement. This corrects v38's
+unconditional permission request that paused the Activity after opening a picker.
+
 `ManualBleScanner` owns one modern Android scan. The Mini picker is constructed
 once and starts only after it is shown. Selection, dismiss/outside cancel,
 background, destroy and explicit connection stop scanning. Session identity
@@ -235,6 +256,7 @@ python Android/MVTBOT/link/tests/test_smali_bridge.py
 python Android/MVTBOT/link/tests/test_ble_session.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
 python Android/MVTBOT/link/tests/test_health_recovery.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
 python Android/MVTBOT/link/tests/test_manual_scanner.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
+python Android/MVTBOT/link/tests/test_manual_permissions.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21"
 python Android/MVTBOT/link/tests/test_startup_subscriptions.py --java-home "$env:LOCALAPPDATA\Programs\AndroidTools\jdk-21" --cc <path-to-zig.exe>
 ```
 
@@ -244,7 +266,7 @@ deterministic Android fakes and checks session, GATT-selection, queue, framing
 and control lifetime contracts. These checks do not replace Android verifier,
 real-phone, real-module, background/foreground or vehicle acceptance tests.
 
-The v38 suite passes 446 BLE, 618 health-recovery and 97 manual-scanner checks.
+The v39 suite passes 58 permission, 446 BLE, 618 health-recovery and 97 manual-scanner checks.
 The startup test feeds actual Java writes through actual MCU source under 38
 schedules. All now finish at reporting [1,1,0], including the former epoch-drop
 regression and slow delivery offsets. The separate cross-stack rearm replay

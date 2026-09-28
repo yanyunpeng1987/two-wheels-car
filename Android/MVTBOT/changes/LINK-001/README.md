@@ -4,16 +4,25 @@ This change keeps the v21 UI and takes over BLE only when the user explicitly
 selects MiniBalan. It does not add Classic Bluetooth/SPP, automatically connect
 to scan results, or identify a product from its advertised name.
 
-Current installed release: **v39 / 2.3.6-mvtbot.12-hc05d**, built in
-`../../build/combined-ui-hc05d-v39-permissions-r1/`, APK SHA-256
-`1dd233c87241feadc6ebf62a374865da1fd22cad5d5ec589cec7ab8429eac153`.
-The installed APK was pulled back and verified. The user selected the vehicle
-and reported normal connection/functions; logs from 14:06:13 to 14:07:29 show
-operational telemetry without fatal errors. This is not long-duration or
-controlled-motion acceptance. See [deployment evidence](../../../../docs/HC05D_DEPLOYMENT_20260928.md).
-v38's installed permission regression remains historical evidence; v39 fixes it.
-APP-UI-001 remains included. APP-UI-004 (actual version in Contact) is deferred;
-v39 does not implement it. UI-only rollback 40 is an unbuilt parameter default.
+Current installed release: **v40 / 2.3.6-mvtbot.13-hc05d**, built in
+`../../build/combined-ui-hc05d-v40-version-info-r1/`, APK SHA-256
+`5676f24fef4ece465211a6d9bb057868e8ebd410dc39e46f512ba093d2e2be71`.
+APP-UI-004 is implemented and installed with the original signature. Phone
+screenshots confirm the installed version on first open and reopen, intact
+company/website, no duplicate row, and no fatal/UI error. See
+[version UI evidence](../../../../docs/APP_VERSION_INFO_20260928.md).
+APP-UI-001 and Bluetooth/MCU behavior remain unchanged. v39's permission fix and
+short communication evidence remain in the [deployment record](../../../../docs/HC05D_DEPLOYMENT_20260928.md).
+The user reported no more automatic disconnects before this update, without a
+specified duration; controlled-motion acceptance is not inferred.
+UI-only rollback 41 is an unbuilt parameter default.
+
+`AppVersionUi.prepare(PopupWindow)` runs before both MainActivity Contact opens.
+It reads this application's PackageInfo versionName and versionCode (long on
+API28+), using the current resource locale for the label. A tagged version row
+is idempotent and allows wrapping. The existing center is placed in a ScrollView
+with its original weight; company/URLSpan children, title, and OK button remain.
+The original UI patch, resource XML and ContactDialog class are unchanged.
 
 ## Build inputs
 
@@ -265,6 +274,11 @@ archived smali. The BLE replay compiles the actual maintained Java with
 deterministic Android fakes and checks session, GATT-selection, queue, framing
 and control lifetime contracts. These checks do not replace Android verifier,
 real-phone, real-module, background/foreground or vehicle acceptance tests.
+
+The shared `transport_sources()` excludes only the independent `AppVersionUi`
+presentation class from these transport fakes; all communication code remains.
+The UI helper is compiled against the real Android SDK in the complete APK and
+verified by phone visual inspection, with no new synthetic layout test.
 
 The v39 suite passes 58 permission, 446 BLE, 618 health-recovery and 97 manual-scanner checks.
 The startup test feeds actual Java writes through actual MCU source under 38

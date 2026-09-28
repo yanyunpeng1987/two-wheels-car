@@ -12,6 +12,7 @@
 | [HC-05D断连与重连调查](HC05D_DISCONNECT_INVESTIGATION_20260928.md) | 9月28日手机主动断连记录、健康截止/扫描/MCU查询回放及下一版取消自动连接要求 |
 | [HC-05D断连修复交付](HC05D_RECONNECT_FIX_20260928.md) | v38手动扫描与有界健康恢复、MCU查询修复、临时SPD门限及待实物验证的成品 |
 | [HC-05D本次部署记录](HC05D_DEPLOYMENT_20260928.md) | 9月28日实际APK安装、MCU烧录/完整回读与PID保持、权限入口补修及当前验证边界 |
+| [APK版本显示与部署](APP_VERSION_INFO_20260928.md) | “联系我们”动态显示已安装版本、APK40构建和手机验证 |
 | [9月28日自稳倒下记录](FALL_CAPTURE_20260928.md) | 冻结的右编码器94计数/SPD首因、Flash及滤波配置核验、后续边界 |
 | [HC-05D兼容与验证](HC05D_COMPATIBILITY.md) | 模块配置、APK/MCU实现、失联契约、构建与实物验收 |
 | [通信协议基线](PROTOCOL.md) | 当前源码行为、传输边界与两端变更约定 |

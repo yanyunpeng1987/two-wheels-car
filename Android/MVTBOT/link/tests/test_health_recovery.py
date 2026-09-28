@@ -182,7 +182,7 @@ def main():
         test.write_text(helpers + CASES, encoding='utf-8')
         classes = root / 'classes'
         classes.mkdir()
-        sources = sorted((here.parent / 'src').rglob('*.java'))
+        sources = fixture.transport_sources(here.parent)
         subprocess.run([str(args.java_home / ('bin/javac' + suffix)), '-encoding', 'UTF-8', '-d', str(classes), *map(str, files + sources + [test])], check=True)
         subprocess.run([str(args.java_home / ('bin/java' + suffix)), '-cp', str(classes), 'com.mvtbot.link.BleSessionTest'], check=True)
 

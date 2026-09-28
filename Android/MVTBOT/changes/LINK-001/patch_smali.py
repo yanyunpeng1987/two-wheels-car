@@ -18,7 +18,7 @@ MAN = "Lcom/Wonder/bot/BluetoothConnect/BLEManager;"
 MAIN = "Lcom/Wonder/bot/MainActivity;"
 CTRL = "Lcom/Wonder/bot/fragment/MiniBalan/BalanceCarControlFragment;"
 MARKER = ".mvtbot-link-001.json"
-PATCH_VERSION = 5
+PATCH_VERSION = 6
 UI_COMMIT = "aa000240b183a8daeed3f09ca084cdf9335e0076"
 UI_PATCH_SHA256 = "953db3d574a712fa707e11ba192c28d59f3758f8c80f3a2808016a423e9e1eef"
 
@@ -256,6 +256,12 @@ def transform(relative, text, ui_fixed=False):
         clicked = find_method(text, "onClick(Landroid/view/View;)V")
         text = replace_once(text, clicked, replace_once(clicked, permission,
                             f"    invoke-static {{p0}}, {MAIN}->mvtbotManualBlePermissions(Landroid/app/Activity;)Z"))
+        clicked = find_method(text, "onClick(Landroid/view/View;)V")
+        contact_show = "    invoke-virtual {p1}, Lcom/Wonder/bot/dialog/ContactDialog;->showDialog()V"
+        if clicked.count(contact_show) != 2:
+            raise ValueError("expected both MainActivity Contact entry points")
+        text = replace_once(text, clicked, clicked.replace(contact_show,
+                            "    invoke-static {p1}, Lcom/mvtbot/link/AppVersionUi;->prepare(Landroid/widget/PopupWindow;)V\n\n" + contact_show))
         if ui_fixed:
             # This reviewed UI composition always selects MiniBalan, but that
             # selection occurs after this onCreate location-permission call.

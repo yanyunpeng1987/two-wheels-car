@@ -56,7 +56,7 @@ def main():
     baseline = verify_snapshot(module, snapshot)
     config = snapshot / "apktool.yml"
     text = config.read_text(encoding="utf-8")
-    version, name = (40, "2.3.6-mvtbot.12-ui-rollback") if args.rollback_ui_only else (39, "2.3.6-mvtbot.12-hc05d")
+    version, name = (41, "2.3.6-mvtbot.13-ui-rollback") if args.rollback_ui_only else (40, "2.3.6-mvtbot.13-hc05d")
     if (args.version_code is None) != (args.version_name is None):
         raise ValueError("Version code and name overrides must be supplied together")
     if args.version_code is not None:

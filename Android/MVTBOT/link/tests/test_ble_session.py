@@ -179,6 +179,14 @@ public final class BleSessionTest {
 }'''
 
 
+def transport_sources(link: Path) -> list[Path]:
+    # This independent presentation helper is not a transport dependency. Its
+    # validation belongs to full-APK compilation against the real Android SDK
+    # and device visual review, not the Bluetooth state-machine Android fakes.
+    version_ui = link / 'src/com/mvtbot/link/AppVersionUi.java'
+    return sorted(path for path in (link / 'src').rglob('*.java') if path != version_ui)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--java-home', type=Path, required=True)
@@ -196,7 +204,7 @@ def main():
         test = root / 'com/mvtbot/link/BleSessionTest.java'
         test.parent.mkdir(parents=True, exist_ok=True)
         test.write_text(TEST, encoding='utf-8')
-        sources = sorted((link / 'src').rglob('*.java'))
+        sources = transport_sources(link)
         classes = root / 'classes'
         classes.mkdir()
         subprocess.run([str(args.java_home / ('bin/javac' + suffix)), '-encoding', 'UTF-8', '-d', str(classes), *map(str, files + sources + [test])], check=True)

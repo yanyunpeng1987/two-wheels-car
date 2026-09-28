@@ -172,7 +172,7 @@ def main() -> None:
     test.parent.mkdir(parents=True, exist_ok=True)
     test.write_text(JAVA, encoding="utf-8")
     java_inputs.append(test)
-    actual_java = sorted((here.parent / "src").rglob("*.java"))
+    actual_java = fixture.transport_sources(here.parent)
     java_inputs += actual_java
     classes = output / "classes"
     classes.mkdir(exist_ok=True)

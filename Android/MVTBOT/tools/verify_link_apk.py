@@ -117,7 +117,7 @@ def main():
     if rows["classes.dex"]["sha256"] == expected["classes.dex"]:
         raise ValueError("Primary DEX was not rebuilt")
     if not args.rollback_ui_only:
-        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation", "ManualBleScanner", "ManualBlePermissions")}
+        required = {f"Lcom/mvtbot/link/{n};" for n in ("MiniBalanLink", "FrameDecoder", "ProtocolValidation", "ManualBleScanner", "ManualBlePermissions", "AppVersionUi")}
         if not required <= dexes["classes4.dex"].classes:
             raise ValueError("New LINK-001 classes are missing")
         if any(c.startswith("Lcom/mvtbot/link/DebugAutoConnect") for c in classes):

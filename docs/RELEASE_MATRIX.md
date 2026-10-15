@@ -13,7 +13,7 @@
 | 本次整合前main | `ddeeb64d3facfd969ced8f21dced4bcff98ee8b3` | PR #1～#4均已合并，保留手柄/管理基线、T1～T4及仓库改名历史；截至本次整合前，无开放PR/Issue或GitHub Release |
 | HC-05D/APP v40来源 | `codex/hc05d-ble-reliability` / `4f14c1b91b8d6c7b5be89ffb4f98483ee4cc03a9` | 已提交的BLE、APP业务补丁/工具和验证摘要；APK及签名、本地输入不随源码上传 |
 | 新手柄r5来源 | `codex/gamepad-oct13`工作区的验收归档 | 本地r5 manifest中的18个源码/测试指纹逐项匹配；完整Firmware共378文件与本次整合树逐字节一致，不能只按该分支HEAD代表未提交r5修改 |
-| 本次整合分支 | `codex/development-sync-20261015` | 从上述main整合HC-05D/APP与r5；提交和PR追溯以本次Git历史为准，不提前编造未来main哈希 |
+| 本次整合分支 | `codex/development-sync-20261015` | 从上述main整合HC-05D/APP与r5，整合提交 `43fe6f2`；[PR #5](https://github.com/yanyunpeng1987/two-wheels-car/pull/5) 的初始push/PR检查均通过，最终提交、合并和后续CI以PR为准 |
 
 2026-09-28 DEV-002已完成同一仓库重命名、5个worktree共用origin同步，PR #4已合入main。改名当时仓库为私有；10月15日已核实为公开，不推断更改可见性的时间或操作者。原仓库名、旧分支建立时的草稿状态保留在[开发日志](DEVELOPMENT_LOG.md)，历史PR/Actions链接使用当前仓库地址。
 

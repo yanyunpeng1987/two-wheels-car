@@ -12,7 +12,7 @@
 |---|---|---|---|
 | DEV-001 | APP 与 MCU 统一目录、需求、版本、Git 流程 | P1 / 已验收（管理基线） | 文档/脚本、历史CI和本地材料核验已有记录；[PR #2](https://github.com/yanyunpeng1987/two-wheels-car/pull/2) 已合入main；不含 APP 业务功能或整车验收 |
 | DEV-002 | GitHub 仓库重命名与本地远程地址同步 | P1 / 已验收（仓库管理） | 2026-09-28同一仓库改名为 `yanyunpeng1987/two-wheels-car`；当时私有状态、仓库ID及refs保持，5个worktree的origin已同步；[PR #4](https://github.com/yanyunpeng1987/two-wheels-car/pull/4) 已合入main。2026-10-15核实仓库现为public，未在本次更改可见性；历史见开发日志 |
-| DEV-003 | 当前开发源码、文档与验证资料整合 | P1 / 待验证（整合检查） | 以main `ddeeb64` 为基线，纳入HC-05D/APP v40提交 `4f14c1b` 和r5归档源码/测试/交付规范；保留T4及仓库改名历史。当前分支 `codex/development-sync-20261015`，具体提交/PR/CI以本次Git历史为准；源码整合不新增设备验收 |
+| DEV-003 | 当前开发源码、文档与验证资料整合 | P1 / 已完成（源码与管理检查） | 以main `ddeeb64` 为基线，纳入HC-05D/APP v40提交 `4f14c1b` 和r5归档源码/测试/交付规范；保留T4及仓库改名历史。整合提交 `43fe6f2`，见[PR #5](https://github.com/yanyunpeng1987/two-wheels-car/pull/5)；本地21/21回归及初始整合远端push/PR检查通过，最新提交与合并状态以PR为准；源码整合不新增设备验收 |
 | FW-REL-001 | 最终固件统一交付、命名和版本记录 | P1 / 已完成（本地交付） | 已建立项目旁BalanceCar-Deliveries；r5为当前推荐，r2/r3历史保留，诊断版不入包。规范产品/芯片/功能/r编号/构建日期/HEX短哈希及独立p包版本；带修改记录、manifest、SHA256与只读校验工具；未改固件或重新烧录，见[固件交付规范](FIRMWARE_DELIVERY.md) |
 | APP-UI-001 | 启动直接进入主页，取消原动画与3秒等待 | P1 / 已有组合手机证据，专项待验证 | 导入UI提交aa00024；v39冷启动直接进入MainActivity，v40保留同一UI组合并已覆盖安装；完整页面/生命周期专项不由基本测试替代，见[部署记录](HC05D_DEPLOYMENT_20260928.md) |
 | APP-UI-002 | 固定MiniBalan并移除机型选择 | P1 / 待验证（组合版） | UI→LINK方法级组合，强制Mini后再接管会话；原UI门禁与两个负面组合样本通过，v39/v40已有Mini入口与安装证据，其他机型负面场景及完整回归待验证 |

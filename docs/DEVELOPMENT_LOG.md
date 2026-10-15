@@ -414,3 +414,5 @@ r5初始三路报告计数增长后，08:57:59～09:03:13完成单只12项车端
 独立整合Keil全量重建日志 `Firmware/build/keil/rebuild-20261015-144606-118e6d6a.log`：79输入，ARMCLANG6.16，0错误0警告；HEX103624字节，Flash10912/16384＋92712/98304，RAM36424/65536，PID Sector1无数据，SHA与已验收r5精确一致。栈4096字节、已知调用链加异常帧1972字节；verify_project、verify_android和sync_vscode检查通过。主机回归21/21组通过、0失败，包含r5的105483项断言、JVM协议1854、BLE446、健康618、扫描97、权限58、跨端重新使能/启动订阅、DEX合成与UI补丁检查；汇总为 `build/maintenance-20261015-tests/summary.json`。本轮整合worktree没有原始APK输入，可选v21 smali/组合回放及真实DEX快照比较未执行，未重建APK。交付目录 `Verify-Release.ps1` 对r5/p1只读校验通过。远程CI由本次PR检查记录，不以本地成功提前声明远端通过。
 
 本次未连接、安装、复位或烧录设备。APP最新已安装记录为v40，其9月28日基本验证对应当时HC-05D HEX；后续r5为当前单只手柄用户基本实测通过。其余样本、另一只手柄、旧实体r5复验、长时/超距、精确停车时延及APK40＋r5完整跨端/物理失联与运动验收不因本次源码整合自动补齐；右编码器异常根因继续未确认。具体提交及PR以本次Git历史为准。
+
+本次源码整合已提交为 `43fe6f272f39f7bae6e327b81eba5c2fbf130ef8` 并推送，创建[PR #5](https://github.com/yanyunpeng1987/two-wheels-car/pull/5)。初始整合的[push检查](https://github.com/yanyunpeng1987/two-wheels-car/actions/runs/38695278813)及[PR检查](https://github.com/yanyunpeng1987/two-wheels-car/actions/runs/38695290204)均通过；仓库内206个Markdown文档链接无断链，113个候选文件的凭据/二进制产物检查无发现。此后仅补充本段及需求/版本追溯，最终合并和后续CI状态以PR为准。

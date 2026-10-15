@@ -17,6 +17,7 @@
 #include "persistent_storage.h"
 #include "pickup_accel_guard.h"
 #include "control_stop_trace.h"
+#include "bluetooth.h"
 
 
 MV_RESULT_ST mv_result; 
@@ -180,6 +181,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				lidar_straight(); 		 //雷达走直线模式
 				ccd_mode();       		 //CCD巡线
 
+                bluetooth_control_update((uint8_t)(running_mode == Normal_Mode));
 				balance_pwm=balance(angle_balance,gyro_balance);    //平衡PID控制 Gyro_Balance平衡角速度极性：前倾为正，后倾为负
 				velocity_pwm=velocity(encoder_left,encoder_right);  //速度环PID控制，速度反馈是正反馈，就是小车快的时候要慢下来就需要再跑快一点
 			
@@ -772,8 +774,9 @@ int myabs(int a) {
 int pick_up(void) {
     uint8_t reason = CONTROL_STOP_NONE;
     const uint32_t cycles_per_ms = SystemCoreClock / 1000U;
-    /* Preserve the original integer truncation and voltage-dependent limits. */
-    const int speed_limit = (voltage > 11.0f) ? 180 : 170;
+    /* Temporary 2x SPD limits per user request (2026-09-28). */
+    /* Keep raw velocity inputs, integer truncation and the voltage branch. */
+    const int speed_limit = (voltage > 11.0f) ? 360 : 340;
     if (myabs(velocity_left) + myabs(velocity_right) > speed_limit) {
         reason |= CONTROL_STOP_SPD;
     }

@@ -25,6 +25,14 @@ REQUIRED_FILES = (
     "changes/README.md", "branding/app-icon.png", "tools/Build-MVTBOT.ps1",
     "tools/Verify-Import.py", "tools/Activate-Android.ps1",
     "tools/Check-AndroidEnvironment.ps1", "baseline/project-files.json",
+    "tools/prepare_link_build.py", "tools/verify_link_apk.py", "tools/verify_combined_ui.py",
+    "tools/smali_equivalence.py",
+    "changes/APP-UI-001/patch.json", "changes/APP-UI-001/verify_release.py",
+    "changes/LINK-001/patch_smali.py", "changes/LINK-001/smali-baseline.json",
+    "changes/LINK-001/ui-import.json",
+    "link/src/com/mvtbot/link/FrameDecoder.java",
+    "link/src/com/mvtbot/link/ProtocolValidation.java",
+    "link/src/com/mvtbot/link/MiniBalanLink.java",
 )
 
 

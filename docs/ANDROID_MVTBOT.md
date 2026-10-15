@@ -7,7 +7,7 @@ Android 材料已汇总到 [`Android/MVTBOT`](../Android/MVTBOT/README.md)，设
 | 查看最新 APP 与构建方法 | [模块 README](../Android/MVTBOT/README.md) |
 | 了解当前版本和未解决问题 | [开发交接](../Android/MVTBOT/docs/HANDOFF.md) |
 | 同时核查 APP 和 MCU 的蓝牙处理 | [协同入口](../Android/MVTBOT/docs/PROTOCOL_COORDINATION.md) |
-| 查看原始 NUL 闪退证据 | [2026-09-16 原始分析](../Android/MVTBOT/materials/deliverables/MVTBOT/diagnostics-20260916/原因分析.md) |
+| 查看原始 NUL 闪退证据 | 2026-09-16 原始分析（本地归档：`../Android/MVTBOT/materials/deliverables/MVTBOT/diagnostics-20260916/原因分析.md`；Git clone 不包含） |
 | 查看归档完整性与本地重建结果 | [汇总验证记录](../Android/MVTBOT/docs/CONSOLIDATION.md) |
 | 查看设备端最新状态 | [开发记录](DEVELOPMENT_LOG.md)、[已知问题](KNOWN_ISSUES.md) |
 

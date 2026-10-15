@@ -1,0 +1,267 @@
+--- a/smali/com/Wonder/bot/StartActivity.smali
++++ b/smali/com/Wonder/bot/StartActivity.smali
+@@ -45 +45 @@
+-    .locals 3
++    .locals 2
+@@ -47 +46,0 @@
+-    .line 30
+@@ -50 +49 @@
+-    const/4 p1, 0x1
++    new-instance v0, Landroid/content/Intent;
+@@ -52,2 +51 @@
+-    .line 31
+-    invoke-virtual {p0, p1}, Lcom/Wonder/bot/StartActivity;->supportRequestWindowFeature(I)Z
++    const-class v1, Lcom/Wonder/bot/MainActivity;
+@@ -55,2 +53 @@
+-    .line 32
+-    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getWindow()Landroid/view/Window;
++    invoke-direct {v0, p0, v1}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
+@@ -58 +55 @@
+-    move-result-object p1
++    invoke-virtual {p0, v0}, Lcom/Wonder/bot/StartActivity;->startActivity(Landroid/content/Intent;)V
+@@ -60,58 +57 @@
+-    const/16 v0, 0x400
+-
+-    invoke-virtual {p1, v0, v0}, Landroid/view/Window;->setFlags(II)V
+-
+-    .line 33
+-    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getWindow()Landroid/view/Window;
+-
+-    move-result-object p1
+-
+-    invoke-static {p1}, Lcom/Wonder/bot/utils/CutoutUtils;->setCutoutBackgroundBlack(Landroid/view/Window;)V
+-
+-    .line 34
+-    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->getLayoutInflater()Landroid/view/LayoutInflater;
+-
+-    move-result-object p1
+-
+-    invoke-static {p1}, Lcom/Wonder/bot/databinding/ActivityStartBinding;->inflate(Landroid/view/LayoutInflater;)Lcom/Wonder/bot/databinding/ActivityStartBinding;
+-
+-    move-result-object p1
+-
+-    iput-object p1, p0, Lcom/Wonder/bot/StartActivity;->binding:Lcom/Wonder/bot/databinding/ActivityStartBinding;
+-
+-    .line 35
+-    invoke-virtual {p1}, Lcom/Wonder/bot/databinding/ActivityStartBinding;->getRoot()Landroid/widget/RelativeLayout;
+-
+-    move-result-object p1
+-
+-    invoke-virtual {p0, p1}, Lcom/Wonder/bot/StartActivity;->setContentView(Landroid/view/View;)V
+-
+-    .line 38
+-    invoke-static {p0}, Lcom/bumptech/glide/Glide;->with(Landroidx/fragment/app/FragmentActivity;)Lcom/bumptech/glide/RequestManager;
+-
+-    move-result-object p1
+-
+-    const v0, 0x7f0701f9
+-
+-    invoke-static {v0}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+-
+-    move-result-object v0
+-
+-    invoke-virtual {p1, v0}, Lcom/bumptech/glide/RequestManager;->load(Ljava/lang/Integer;)Lcom/bumptech/glide/RequestBuilder;
+-
+-    move-result-object p1
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/StartActivity;->binding:Lcom/Wonder/bot/databinding/ActivityStartBinding;
+-
+-    iget-object v0, v0, Lcom/Wonder/bot/databinding/ActivityStartBinding;->image:Landroid/widget/ImageView;
+-
+-    invoke-virtual {p1, v0}, Lcom/bumptech/glide/RequestBuilder;->into(Landroid/widget/ImageView;)Lcom/bumptech/glide/request/target/ViewTarget;
+-
+-    .line 39
+-    iget-object p1, p0, Lcom/Wonder/bot/StartActivity;->mainHandler:Landroid/os/Handler;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/StartActivity;->openMainActivity:Ljava/lang/Runnable;
+-
+-    const-wide/16 v1, 0xbb8
+-
+-    invoke-virtual {p1, v0, v1, v2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
++    invoke-virtual {p0}, Lcom/Wonder/bot/StartActivity;->finish()V
+--- a/smali/com/Wonder/bot/MainActivity.smali
++++ b/smali/com/Wonder/bot/MainActivity.smali
+@@ -1424,8 +1424,3 @@
+-    .locals 1
+-
+-    const/4 v0, -0x1
+-
+-    if-ne p1, v0, :cond_0
+-
+-    .line 429
+-    sget-object p1, Lcom/Wonder/bot/Device;->H5S:Lcom/Wonder/bot/Device;
++    .locals 3
++
++    sget-object p1, Lcom/Wonder/bot/Device;->MINIBALAN:Lcom/Wonder/bot/Device;
+@@ -1435,39 +1430,12 @@
+-    .line 430
+-    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
+-
+-    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->openDrawer(Landroid/view/View;)V
+-
+-    goto :goto_0
+-
+-    .line 432
+-    :cond_0
+-    sget-object v0, Lcom/Wonder/bot/Device;->H5S:Lcom/Wonder/bot/Device;
+-
+-    invoke-static {p1, v0}, Lcom/Wonder/bot/Device;->fromIdOrDefault(ILcom/Wonder/bot/Device;)Lcom/Wonder/bot/Device;
+-
+-    move-result-object p1
+-
+-    invoke-direct {p0, p1}, Lcom/Wonder/bot/MainActivity;->selectDevice(Lcom/Wonder/bot/Device;)V
+-
+-    .line 433
+-    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
+-
+-    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->isDrawerOpen(Landroid/view/View;)Z
+-
+-    move-result p1
+-
+-    if-eqz p1, :cond_1
+-
+-    .line 434
+-    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
+-
+-    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->closeDrawer(Landroid/view/View;)V
+-
+-    :cond_1
+-    :goto_0
++    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
++
++    iget-object v1, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
++
++    const/4 v2, 0x0
++
++    invoke-virtual {v0, v1, v2}, Landroidx/drawerlayout/widget/DrawerLayout;->closeDrawer(Landroid/view/View;Z)V
++
++    const/4 v2, 0x1
++
++    invoke-virtual {v0, v2}, Landroidx/drawerlayout/widget/DrawerLayout;->setDrawerLockMode(I)V
++
+@@ -2881,0 +2850,12 @@
++    sget-object p1, Lcom/Wonder/bot/Device;->MINIBALAN:Lcom/Wonder/bot/Device;
++
++    invoke-virtual {p1}, Lcom/Wonder/bot/Device;->id()I
++
++    move-result v0
++
++    sput v0, Lcom/Wonder/bot/MainActivity;->cardChoosed:I
++
++    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->deviceSelectionStore:Lcom/Wonder/bot/navigation/DeviceSelectionStore;
++
++    invoke-virtual {v0, p1}, Lcom/Wonder/bot/navigation/DeviceSelectionStore;->save(Lcom/Wonder/bot/Device;)V
++
+@@ -5316,21 +5296,2 @@
+-    .locals 1
+-
+-    .line 1057
+-    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
+-
+-    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->isDrawerOpen(Landroid/view/View;)Z
+-
+-    move-result p1
+-
+-    if-nez p1, :cond_0
+-
+-    .line 1058
+-    iget-object p1, p0, Lcom/Wonder/bot/MainActivity;->drawerLayout:Landroidx/drawerlayout/widget/DrawerLayout;
+-
+-    iget-object v0, p0, Lcom/Wonder/bot/MainActivity;->llLeft:Landroid/widget/LinearLayout;
+-
+-    invoke-virtual {p1, v0}, Landroidx/drawerlayout/widget/DrawerLayout;->openDrawer(Landroid/view/View;)V
+-
+-    :cond_0
++    .locals 0
++
+--- a/smali/com/Wonder/bot/dialog/ContactDialog.smali
++++ b/smali/com/Wonder/bot/dialog/ContactDialog.smali
+@@ -141 +141 @@
+-    const-string/jumbo v1, "www.hiwonder.com.cn"
++    const-string/jumbo v1, "http://www.mvtlabs.com/"
+@@ -147 +147 @@
+-    const-string/jumbo v1, "www.hiwonder.com"
++    const-string/jumbo v1, "http://www.mvtlabs.com/"
+@@ -159 +159 @@
+-    const-string v5, "https://"
++    const-string v5, ""
+@@ -237,0 +238,2 @@
++
++    const/16 v0, 0x8
+--- a/res/layout/base_content.xml
++++ b/res/layout/base_content.xml
+@@ -6 +6 @@
+-            <ImageView android:id="@id/iv_menu" android:background="?selectableItemBackgroundBorderless" android:src="@drawable/menu_blue" android:scaleType="fitCenter" android:layout_centerVertical="true" android:layout_marginStart="@dimen/margin_left" android:layout_alignParentStart="true" style="@style/menu_fit" />
++            <ImageView android:id="@id/iv_menu" android:visibility="gone" android:enabled="false" android:clickable="false" android:focusable="false" android:background="?selectableItemBackgroundBorderless" android:src="@drawable/menu_blue" android:scaleType="fitCenter" android:layout_centerVertical="true" android:layout_marginStart="@dimen/margin_left" android:layout_alignParentStart="true" style="@style/menu_fit" />
+@@ -11 +11 @@
+-            <ImageView android:id="@id/batView" android:src="@drawable/bat" android:scaleType="fitCenter" android:layout_centerVertical="true" android:layout_marginStart="20.0dp" android:layout_toEndOf="@id/iv_menu" style="@style/bat_fit_1" />
++            <ImageView android:id="@id/batView" android:src="@drawable/bat" android:scaleType="fitCenter" android:layout_centerVertical="true" android:layout_marginStart="@dimen/margin_left" android:layout_alignParentStart="true" style="@style/bat_fit_1" />
+--- a/res/layout/layout_contact.xml
++++ b/res/layout/layout_contact.xml
+@@ -8,5 +8,5 @@
+-    <RelativeLayout android:layout_width="match_parent" android:layout_height="0.0dp" android:layout_weight="4.0">
+-        <ImageView android:id="@id/logo1_img" android:background="?selectableItemBackgroundBorderless" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/logo_middle_min" android:scaleType="fitCenter" android:layout_centerHorizontal="true" />
+-        <TextView android:id="@id/company" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dp" android:layout_marginTop="15.0dp" android:layout_marginRight="10.0dp" android:text="@string/company" android:layout_below="@id/logo1_img" android:layout_centerHorizontal="true" android:textAllCaps="false" style="@style/title_style_1" />
+-        <TextView android:id="@id/email" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:text="@string/email" android:layout_below="@id/company" android:layout_alignLeft="@id/company" style="@style/title_style_1" />
+-        <RelativeLayout android:id="@id/wwwlayout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:layout_below="@id/email" android:layout_alignLeft="@id/company">
++    <RelativeLayout android:gravity="center" android:layout_width="match_parent" android:layout_height="0.0dp" android:layout_weight="4.0">
++        <ImageView android:id="@id/logo1_img" android:visibility="gone" android:background="?selectableItemBackgroundBorderless" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@null" android:scaleType="fitCenter" android:layout_centerHorizontal="true" />
++        <TextView android:id="@id/company" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dp" android:layout_marginTop="15.0dp" android:layout_marginRight="10.0dp" android:text="@string/company" android:layout_centerHorizontal="true" android:textAllCaps="false" style="@style/title_style_1" />
++        <TextView android:id="@id/email" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:text="@string/email" android:layout_below="@id/company" android:layout_alignLeft="@id/company" style="@style/title_style_1" />
++        <RelativeLayout android:id="@id/wwwlayout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:layout_below="@id/company" android:layout_alignLeft="@id/company">
+@@ -14 +14 @@
+-            <TextView android:id="@id/www" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="www.hiwonder.com" android:layout_toRightOf="@id/website" style="@style/title_style_1" />
++            <TextView android:id="@id/www" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/website_http" android:layout_toRightOf="@id/website" style="@style/title_style_1" />
+@@ -16 +16 @@
+-        <TextView android:id="@id/scan_code" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:text="@string/webchat_subscription" android:layout_below="@id/wwwlayout" android:layout_alignLeft="@id/company" style="@style/title_style_1" />
++        <TextView android:id="@id/scan_code" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" android:text="@string/webchat_subscription" android:layout_below="@id/wwwlayout" android:layout_alignLeft="@id/company" style="@style/title_style_1" />
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -121 +121 @@
+-    <string name="company">Manufacturer: Shenzhen Hiwonder Technology Co., Ltd.</string>
++    <string name="company">公司：杭州矩视科技有限公司</string>
+@@ -212 +212 @@
+-    <string name="email">E-mail: support@hiwonder.com</string>
++    <string name="email"></string>
+@@ -621 +621 @@
+-    <string name="webchat_subscription">webchat subscription</string>
++    <string name="webchat_subscription"></string>
+@@ -623 +623 @@
+-    <string name="website_http">www.hiwonder.com</string>
++    <string name="website_http">http://www.mvtlabs.com/</string>
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -116 +116 @@
+-    <string name="company">公司：深圳市幻尔科技有限公司</string>
++    <string name="company">公司：杭州矩视科技有限公司</string>
+@@ -207 +207 @@
+-    <string name="email">邮箱：support.cn@hiwonder.com</string>
++    <string name="email"></string>
+@@ -564 +564 @@
+-    <string name="webchat_subscription">公众号：幻尔机器人</string>
++    <string name="webchat_subscription"></string>
+@@ -566 +566 @@
+-    <string name="website_http">www.hiwonder.com.cn</string>
++    <string name="website_http">http://www.mvtlabs.com/</string>
+--- a/res/values-zh-rTW/strings.xml
++++ b/res/values-zh-rTW/strings.xml
+@@ -105 +105 @@
+-    <string name="company">公司：深圳市幻爾科技有限公司</string>
++    <string name="company">公司：杭州矩视科技有限公司</string>
+@@ -181 +181 @@
+-    <string name="email">E-mail：support@hiwonder.com</string>
++    <string name="email"></string>
+@@ -514 +514 @@
+-    <string name="webchat_subscription">公眾號：幻尔机器人</string>
++    <string name="webchat_subscription"></string>
+@@ -516 +516 @@
+-    <string name="website_http">www.hiwonder.com</string>
++    <string name="website_http">http://www.mvtlabs.com/</string>

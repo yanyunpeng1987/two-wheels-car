@@ -1,6 +1,6 @@
 # 开发与提交流程
 
-本项目使用私有仓库，默认分支 `main`。固件与 APP 在一个仓库中协同维护；以需求 ID 关联分支、代码、协议和验收，按功能分支提交 PR。
+本项目仓库在2026-10-15核实为公开，默认分支 `main`；维护任务保持现有可见性。固件与 APP 在一个仓库中协同维护；以需求 ID 关联分支、代码、协议和验收，按功能分支提交 PR。
 
 ## 开始与并行开发
 
@@ -54,9 +54,9 @@ python tools/verify_android.py --project-root Android/MVTBOT/project
 powershell -NoProfile -ExecutionPolicy Bypass -File Android/MVTBOT/tools/Build-MVTBOT.ps1 -Unsigned
 ```
 
-输入核验针对未修改的 v21 基线。业务修改后的差异应版本化，不能覆盖代码来消除报错。正式签名使用本机既有材料；缺失时不创建替代密钥冒充原证书。当前打包脚本要求 DEX 保持原样，逻辑开发必须另行调整并验证构建路径。
+输入核验针对未修改的 v21 基线。业务修改后的差异应版本化，不能覆盖代码来消除报错。正式签名使用本机既有材料；缺失时不创建替代密钥冒充原证书。当前构建以固定v21输入建立快照，按受版本管理的UI/LINK补丁重建主DEX并编译自有Java辅助DEX，其余原DEX保持；必须验证组合后的类、桥接签名、资源和最终APK载荷。`-BaselineOnly`用于原v21基线；默认组合为v40，UI-only默认41只是构建参数，未构建不视为已交付。
 
-GitHub Actions 检查固件源码布局、主机 C 回归、Android 管理文件/清单与工具语法。CI 不含私有 APK 输入、Android 签名和 Keil 许可，**CI 成功不等于 APK/Keil 完整编译、安装/烧录或整车验收**。
+GitHub Actions 检查固件源码布局、主机 C 回归、Android 管理文件/清单与工具语法。CI 不含本地 APK 输入、Android 签名和 Keil 许可，**CI 成功不等于 APK/Keil 完整编译、安装/烧录或整车验收**。
 
 ## 提交、版本与回退
 

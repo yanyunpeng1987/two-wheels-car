@@ -105,8 +105,12 @@ void MX_USB_HOST_Init(void)
  */
 void MX_USB_HOST_Process(void)
 {
-  /* USB Host Background task */
+  /* USB SOF can stop while the IMU/control interrupt continues running.
+     DWT is already initialized by the board timebase and handles wrap through
+     unsigned cycle differences; keep both gates ahead of gamepad_scan(). */
+  USBH_HID_GamepadSafetyPoll(&hUsbHostFS, DWT->CYCCNT, SystemCoreClock / 1000U);
   USBH_Process(&hUsbHostFS);
+  USBH_HID_GamepadSafetyPoll(&hUsbHostFS, DWT->CYCCNT, SystemCoreClock / 1000U);
 }
 /*
  * user callback definition

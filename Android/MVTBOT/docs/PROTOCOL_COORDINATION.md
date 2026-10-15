@@ -41,3 +41,7 @@ CMD|7|<电压整数>|$          电压
 - 用户观察、源码推断、重放结果和实机验收分别记录。改变一个变量后再比较，不用静止零速样本替代运动条件验证。
 
 新的原始证据建议放在 `materials/evidence/<日期>-<主题>/`，对应结论与状态写在可进入 Git 的文档中。不要覆盖 2026-09-16 的原始日志。
+
+## LINK-001 当前代码入口
+
+新 MiniBalan BLE 会话及收发见 `link/src/com/mvtbot/link/MiniBalanLink.java`；完整帧与字段校验见同目录 `FrameDecoder.java`、`ProtocolValidation.java`。v21只在其他机器人分支保持原通信路径。桥接点和原始smali哈希由 `changes/LINK-001/patch_smali.py`、`smali-baseline.json` 固定。MCU新增 `Firmware/BSP/bluetooth_link.c` portable解析/守卫/队列与实际HAL适配。契约及验收参见仓库 `docs/HC05D_COMPATIBILITY.md`。

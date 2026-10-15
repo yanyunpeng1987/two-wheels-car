@@ -26,6 +26,32 @@ static const uint16_t gamepad_20bc_5500_button_map[15] = {
     0U                           /* Usage 15: unassigned */
 };
 
+/*
+ * 0810:0001 and the observed 20BC eight-byte layout use this button map.
+ * Face buttons remain unmapped to prevent midpoint/PID edits.
+ * PC guided captures on 2026-10-08 confirmed Usages 5..10 as
+ * L1, R1, L2, R2, Select, Start. Usages 11/12 retain the provisional
+ * L3/R3 names; neither currently triggers a vehicle control action.
+ */
+static const uint16_t gamepad_0810_0001_button_map[12] = {
+    0U, 0U, 0U, 0U,
+    GAMEPAD_BUTTON_MASK_L1, GAMEPAD_BUTTON_MASK_R1,
+    GAMEPAD_BUTTON_MASK_L2, GAMEPAD_BUTTON_MASK_R2,
+    GAMEPAD_BUTTON_MASK_SELECT, GAMEPAD_BUTTON_MASK_START,
+    GAMEPAD_BUTTON_MASK_L3, GAMEPAD_BUTTON_MASK_R3
+};
+
+/* 2026-10-13 guided physical captures on receiver A/interface 1 confirmed
+   Usage 7/8=L1/R1, 9/10=L2/R2, 11/12=Select/Start. Other usages have no
+   vehicle action; in particular measured face usages 14/15 cannot edit PID. */
+static const uint16_t gamepad_20bc_5500_9byte_button_map[15] = {
+    0U, 0U, 0U, 0U, 0U, 0U,
+    GAMEPAD_BUTTON_MASK_L1, GAMEPAD_BUTTON_MASK_R1,
+    GAMEPAD_BUTTON_MASK_L2, GAMEPAD_BUTTON_MASK_R2,
+    GAMEPAD_BUTTON_MASK_SELECT, GAMEPAD_BUTTON_MASK_START,
+    0U, 0U, 0U
+};
+
 static int8_t centered_axis(uint8_t value, int invert)
 {
     int axis = invert ? 128 - (int)value : (int)value - 128;
@@ -91,6 +117,68 @@ int Gamepad_DecodeReport(GamepadReportProfile profile, const uint8_t *data,
         decoded.rx = centered_axis(data[5], 0);
         decoded.ry = centered_axis(data[6], 1);
         /* Bytes 7 and 8 are the captured C5/C4 fields, currently unused. */
+        break;
+
+    case GAMEPAD_REPORT_20BC_5500_8BYTE:
+    case GAMEPAD_REPORT_20BC_5500_9BYTE:
+        if (length != ((profile == GAMEPAD_REPORT_20BC_5500_9BYTE) ? 9U : 8U)) {
+            return 0;
+        }
+        hat = data[2] & 0x0FU;
+        decoded.hat = (hat >= 8U) ? GAMEPAD_HAT_CENTERED : hat_directions[hat];
+        raw_buttons = (uint16_t)(((uint16_t)data[0] | ((uint16_t)data[1] << 8)) & 0x7FFFU);
+        for (index = 0U;
+             index < ((profile == GAMEPAD_REPORT_20BC_5500_9BYTE) ? 15U : 12U); ++index) {
+            if ((raw_buttons & (uint16_t)(1U << index)) != 0U) {
+                decoded.buttons |= (profile == GAMEPAD_REPORT_20BC_5500_9BYTE) ?
+                    gamepad_20bc_5500_9byte_button_map[index] :
+                    gamepad_0810_0001_button_map[index];
+            }
+        }
+        decoded.lx = centered_axis(data[3], 0);
+        decoded.ly = centered_axis(data[4], 1);
+        /* Eight-byte vehicle captures identify right X as Rz, not Z.
+           Nine-byte physical captures identify right X/Y as Z/Rz. */
+        decoded.rx = centered_axis(data[(profile == GAMEPAD_REPORT_20BC_5500_9BYTE) ?
+                                        GAMEPAD_20BC_9BYTE_RIGHT_X_OFFSET : 6U], 0);
+        decoded.ry = centered_axis(data[(profile == GAMEPAD_REPORT_20BC_5500_9BYTE) ?
+                                        GAMEPAD_20BC_9BYTE_RIGHT_Y_OFFSET : 5U], 1);
+        /* C5/C4 are byte-7 nibbles in eight-byte mode, separate bytes 7/8
+           in nine-byte mode. Neither encoding is a connection flag. */
+        break;
+
+    case GAMEPAD_REPORT_0810_0001:
+        if (length != 8U || (data[0] != 1U && data[0] != 2U)) {
+            return 0;
+        }
+        hat = data[5] & 0x0FU;
+        decoded.hat = (hat >= 8U) ? GAMEPAD_HAT_CENTERED : hat_directions[hat];
+        raw_buttons = (uint16_t)(((uint16_t)data[5] >> 4) | ((uint16_t)data[6] << 4));
+        for (index = 0U; index < 12U; ++index) {
+            if ((raw_buttons & (uint16_t)(1U << index)) != 0U) {
+                decoded.buttons |= gamepad_0810_0001_button_map[index];
+            }
+        }
+        /* Descriptor byte order is Z, Rz, X, Y; Report ID is a USB byte. */
+        decoded.lx = centered_axis(data[3], 0);
+        decoded.ly = centered_axis(data[4], 1);
+        decoded.rx = centered_axis(data[1], 0);
+        decoded.ry = centered_axis(data[2], 1);
+        if (decoded.rx >= -GAMEPAD_0810_ANALOG_TURN_DEADZONE &&
+            decoded.rx <= GAMEPAD_0810_ANALOG_TURN_DEADZONE) {
+            /* Digital directions are indistinguishable from their face keys.
+               Opposite directions cancel; up/down do not request a turn. */
+            if ((raw_buttons & GAMEPAD_0810_DIGITAL_RIGHT_MASK) &&
+                !(raw_buttons & GAMEPAD_0810_DIGITAL_LEFT_MASK)) {
+                decoded.rx = 127;
+            } else if ((raw_buttons & GAMEPAD_0810_DIGITAL_LEFT_MASK) &&
+                       !(raw_buttons & GAMEPAD_0810_DIGITAL_RIGHT_MASK)) {
+                decoded.rx = -127;
+            } else {
+                decoded.rx = 0;
+            }
+        }
+        /* Byte 7 is vendor page FF00; no inferred connection-state meaning. */
         break;
 
     default:

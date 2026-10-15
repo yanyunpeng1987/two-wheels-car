@@ -376,6 +376,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART2) {
         Lidar_ErrorCallback(huart);
+    } else if (huart->Instance == USART6) {
+        bluetooth_uart_error_callback(huart);
     }
 }
 

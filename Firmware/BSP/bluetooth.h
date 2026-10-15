@@ -32,6 +32,21 @@ void bluetooth_tx_complete_callback(UART_HandleTypeDef *huart);
 void bluetooth_handle_command(void);
 void bluetooth_periodic_update(void);
 void bluetooth_main_loop_task(void);
+void bluetooth_uart_error_callback(UART_HandleTypeDef *huart);
+void bluetooth_control_update(uint8_t normal_mode);
+
+typedef struct {
+    uint32_t rx_errors;
+    uint32_t rx_restart_errors;
+    uint32_t rx_overflows;
+    uint32_t invalid_frames;
+    uint32_t stale_frames;
+    uint32_t tx_errors;
+} BluetoothLinkStats;
+extern volatile BluetoothLinkStats bluetooth_link_stats;
+/* Motion-epoch rejects are also counted in stale_frames; service frames are kept. */
+extern volatile uint32_t bluetooth_epoch_rejected_frames;
+extern volatile uint32_t bluetooth_epoch_service_frames;
 #define DEBUG_PRINT_BUFFER_SIZE     256
 
 

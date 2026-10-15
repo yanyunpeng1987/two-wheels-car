@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "product": "BalanceCar",
+  "target": "STM32F401RB",
+  "currentRevision": "r5",
+  "packageDate": "2026-10-14",
+  "releases": [
+    {
+      "revision": "r5",
+      "buildDate": "2026-10-14",
+      "packageRevision": 1,
+      "status": "current-user-accepted",
+      "sourceProject": ".",
+      "sourceDirectory": "build/new-model/gamepad-r5",
+      "originalStem": "BalanceCar-gamepad-r5",
+      "hexSha256": "89afb248572677cd21a493c526feb026b76bc89b9b60239f59b28bef26e17c6d",
+      "title": "新九字节2.4G手柄：当前推荐",
+      "compatibility": "本次20BC:5500/bcd1003、端点64字节/报告描述符123字节、实际9字节报告的新型号；当前这一只已完成用户实测。旧型号的软件分支保留，但不将其写成r5旧实物复验通过。",
+      "acceptance": "2026-10-14用户反馈“我实测也是OK了”；此前12项车端输入检查、105483项主机断言、Keil编译及两次运行后Flash/PID回读通过。",
+      "limits": "其他4只仅确认描述符一致；同对另一只、旧型号在r5上的实物复验、长时/超距与精确停车时延未补齐。辅助端点STALL或端口失效需重新插拔/枚举，未实现自动恢复。",
+      "changes": [
+        "按实测9字节格式适配左右摇杆和L1/L2/R1/R2/SELECT/START，右水平/垂直轴为byte5/6。",
+        "持续读取并丢弃系统接口IN83输入，解决两路手柄只能收到初始报告的问题。",
+        "保留双通道互斥与回中交接，新增独立DWT每路500ms期限及端口/设备类型失效清零。"
+      ]
+    },
+    {
+      "revision": "r3",
+      "buildDate": "2026-10-08",
+      "packageRevision": 1,
+      "status": "historical-user-accepted",
+      "sourceProject": "Two-wheels-Car-twin0810",
+      "sourceDirectory": "build/twin-dual/delivery",
+      "originalStem": "BalanceCar-twin-dual-r3",
+      "hexSha256": "c0e1fbdc394f043bda1c42034922b75eeb4f69e6eb7f3e9cd6606440b41277a0",
+      "title": "旧八字节双手柄：历史验收版本",
+      "compatibility": "先前已适配的20BC:5500、端点8字节/描述符90字节双手柄。保留0810:0001协议分支；不能作为新九字节手柄的已验证替代版。",
+      "acceptance": "双接口/互斥控制已有车端证据；用户2026-10-13反馈此前手柄工作正常。",
+      "limits": "原固定时序页面评分4/13与独立核心动作验证分别保留，不包装成13项全通过；不是当前新九字节手柄推荐版。",
+      "changes": [
+        "同一对手柄任意一只可用。",
+        "当前控制者回中松键后，经零输出窗口由新的中位/动作取得控制权；两只输入不混合。"
+      ]
+    },
+    {
+      "revision": "r2",
+      "buildDate": "2026-10-08",
+      "packageRevision": 1,
+      "status": "historical-user-accepted",
+      "sourceProject": "Two-wheels-Car-twin0810",
+      "sourceDirectory": "build/twin-0810/delivery",
+      "originalStem": "BalanceCar-twin0810-r2",
+      "hexSha256": "9b1581cf099562ce481b29024b557bed32e06e507a723f07e3353b566d8f8f4b",
+      "title": "旧八字节单手柄：历史回退版本",
+      "compatibility": "实际车端为20BC:5500、端点8字节/描述符90字节、接口0；原twin0810文件名来自PC阶段，不能据此判断实际车端型号。",
+      "acceptance": "用户反馈当时新手柄基本功能正常；四向、回中和关机车端输入已有记录。",
+      "limits": "仅旧型号单只使用范围，不保证新九字节型号在此版可用；回退前仍需核对主板/电机映射和保留当前板PID。",
+      "changes": [
+        "增加实际车端八字节格式，右水平轴使用byte6。",
+        "完成当时单只手柄适配，未增加后续r3双手柄互斥控制。"
+      ]
+    }
+  ],
+  "packageHistory": [
+    {
+      "date": "2026-10-14",
+      "packageRevision": 1,
+      "firmware": [
+        {
+          "revision": "r5",
+          "hexSha256": "89afb248572677cd21a493c526feb026b76bc89b9b60239f59b28bef26e17c6d"
+        },
+        {
+          "revision": "r3",
+          "hexSha256": "c0e1fbdc394f043bda1c42034922b75eeb4f69e6eb7f3e9cd6606440b41277a0"
+        },
+        {
+          "revision": "r2",
+          "hexSha256": "9b1581cf099562ce481b29024b557bed32e06e507a723f07e3353b566d8f8f4b"
+        }
+      ],
+      "changes": "首次统一交付目录、ASCII命名、逐文件SHA256、调试资料分层和当前推荐指针；所有HEX/AXF/MAP内容与原验收归档一致，未重新编译或烧录。r4和诊断版不纳入用户交付。"
+    }
+  ]
+}

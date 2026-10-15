@@ -1,12 +1,24 @@
 # Android 开发交接
 
-## 当前版本
+## 当前构建与验证（2026-09-28）
+
+当前默认输出为 `2.3.6-mvtbot.13-hc05d`，versionCode **40**，保留APP-UI-001、原包名和签名，已覆盖安装。产物为模块根目录下的 `build/combined-ui-hc05d-v40-version-info-r1/MVTBOT.apk`，SHA-256 `5676f24fef4ece465211a6d9bb057868e8ebd410dc39e46f512ba093d2e2be71`。
+
+APP-UI-004已实现：读取实际PackageInfo，在“联系我们”官网下显示版本。手机首次打开及确定后重开均显示 `2.3.6-mvtbot.13-hc05d (40)`，公司官网完整、单行无重复，无fatal/UI错误；详见[版本信息交付记录](../../../docs/APP_VERSION_INFO_20260928.md)。中心可滚动并允许换行，标题和确定按钮保留。`AppVersionUi`由真实SDK完整APK编译及手机视觉核验覆盖，主机`transport_sources()`仅排除该UI类，通信代码全部保留在原回归中。
+
+启动自动连接已删除，现代手动扫描只在用户显示列表后启动一次，10秒截止，并保留完整生命周期清理。v39进一步修复权限顺序：Android12及以上仅检查SCAN/CONNECT，旧Android6～11检查Fine；已授权不请求，缺项申请后本次不开扫描，授权后需再次点击。固定Mini界面启动不请求蓝牙权限，其他机型保留旧路径。健康查询预算和恢复后中性使能规则延续v38。
+
+v39历史产物SHA-256为 `1dd233c87241feadc6ebf62a374865da1fd22cad5d5ec589cec7ab8429eac153`。当时用户选择本车并反馈连接、功能正常；14:06:13进入operational，截至14:07:29统计CMD7为61、CMD4与CMD5各257，无fatal。更新v40前用户另反馈蓝牙不再自动断开，但未提供具体时长。本次v40未改蓝牙或MCU，不把上述反馈扩展为完整长时、反复重连及受控运动验收；配对与通信证据保留在[部署记录](../../../docs/HC05D_DEPLOYMENT_20260928.md)。
+
+v38 r2曾安装，随后暴露已授权仍请求权限导致扫描立即被onPause取消的问题，已在v39修复；[v38构建记录](../../../docs/HC05D_RECONNECT_FIX_20260928.md)保留历史证据。下列v21/v36也均为历史记录。UI-only回退号41仅为参数默认值，未构建。
+
+## v21 历史导入基线
 
 | 项目 | 当前资料基线 |
 |---|---|
 | 应用名 / 包名 | MVTBOT / `com.Wonder.bot` |
-| 当前 APK | `materials/deliverables/MVTBOT/icon-update-v21/MVTBOT.apk`（相对模块根目录） |
-| 当前版本 | `2.3.6-mvtbot.2`，versionCode 21 |
+| 基线 APK | `materials/deliverables/MVTBOT/icon-update-v21/MVTBOT.apk`（相对模块根目录） |
+| 基线版本 | `2.3.6-mvtbot.2`，versionCode 21 |
 | SHA-256 | `6b27d6af2261b0f4d559828f9fcc6df1a9e3f464c0d8b592278ceadc1a98463e` |
 | 签名证书 SHA-256 | `71e85f94fb18c04425c908661e7321dce8dc182e7077cc541004aaf539e15287` |
 | 最初原版 | Google Play Wonderbot 2.3.6 / 20，base + ARM64 + xxhdpi + 中文 4 包 |
@@ -18,7 +30,7 @@ v20 APK SHA-256 为 `f2a94782f8763ea6fe1867ba5b5ffa4f5e13878a67a66f632b644f7654c
 
 ## APP-001：CMD4 速度解析遇 NUL 时闪退
 
-状态：**直接触发点已证实，上游来源未确认，用户明确延后修复，等待设备端日志。** 本次资料整合未修复或重新安装 APP。
+2026-09-16历史状态：**直接触发点已证实，上游来源未确认，当时用户明确延后修复，等待设备端日志。** 当时资料整合未修复或重新安装 APP。后续 LINK-001 已实现帧/字段校验与防闪退主机回归；这不等于 NUL 上游来源已查明，也不代替当前版本的异常输入实测。
 
 Xiaomi 13 的 MVTBOT 在 13:54:02、13:54:43，以及 Xiaomi 14 的原始 Google Play 包在 14:18:39，均因为第二个电机速度字段为 `-1\0`，在 `BalanceCarHomePageFragment.handleRecv` 原源码行 239 调用 `Integer.parseInt` 时崩溃。原版 4 个 APK 哈希与提取时完全一致，不能将该异常认定为改名/合并才产生。
 
@@ -26,11 +38,11 @@ Xiaomi 13 的 MVTBOT 在 13:54:02、13:54:43，以及 Xiaomi 14 的原始 Google
 
 原始日志中的 `C0 80` 是 JNI Modified UTF-8 对一个 Java NUL 的表示，不是两个普通乱码，也不等于线上收到了 `C0 80`。必须保留 `.raw`，不要仅依靠早期错误解码的 `.txt`。固定位置提示检查组包/长度/缓冲区，但不能直接定责为某个 `snprintf` 或 MCU 故障。
 
-主证据：[完整分析](../materials/deliverables/MVTBOT/diagnostics-20260916/原因分析.md)。原始证据位于 `materials/evidence/bluetooth-20260916/`。
+主证据：完整分析（本地归档：`../materials/deliverables/MVTBOT/diagnostics-20260916/原因分析.md`；Git clone 不包含）。原始证据位于 `materials/evidence/bluetooth-20260916/`。
 
 ## APP-002：页面销毁时 Receiver not registered
 
-状态：独立记录，未修复。原版 2026-09-16 13:56:52 在 `MainActivity.onDestroy → BLEManager.unregister` 出现接收器注销异常。它与 APP-001 的 NUL/整数转换堆栈不同，不能混算为同一原因。
+2026-09-16历史状态：独立记录，当时未修复。原版 13:56:52 在 `MainActivity.onDestroy → BLEManager.unregister` 出现接收器注销异常。后续 LINK-001 已纳入注册上下文及幂等清理修复与主机回归，完整生命周期实测仍待执行。它与 APP-001 的 NUL/整数转换堆栈不同，不能混算为同一原因。
 
 ## 分析材料的可信度
 
@@ -47,3 +59,17 @@ Xiaomi 13 的 MVTBOT 在 13:54:02、13:54:43，以及 Xiaomi 14 的原始 Google
 4. 构建脚本不进行手机安装或固件烧录；部署时重新检查设备身份、当前版本和签名。
 
 本模块资料于 2026-09-24 归档，根目录设备端还在其他任务中演进。本次未把设备端 T1 等后续修改视为 APP-001 的修复证据。
+
+## 2026-09-24 LINK-001 后续实现
+
+上面的版本与崩溃叙述为 v21 历史基线。用户现已明确授权 HC-05D BLE、完整帧防闪退与失联保护一起开发。维护输入保持 v21；默认构建输出升级到 v24，使用独立 Java 会话/协议组件和版本化 smali 桥接，处理 E0FF/FFE0、GATT ready、旧事件隔离、页面/传感器生命周期与100ms心跳。
+
+防闪退回归已覆盖原NUL类型及电压/PID/波形入口，不将其表述为上游根因已确定。业务源码、DEX签名检查和主机回放不能代替真实ART、手机蓝牙与整车测试。版本组合、实物步骤和当前证据见仓库 `docs/HC05D_COMPATIBILITY.md`、`docs/HC05D_TEST_REPORT.md`。
+
+## 2026-09-24 HC-05D 现场后续（历史）
+
+截至当日，默认业务构建推进到v36，UI-only回退候选为v37；v21保持不可变输入。手机曾安装v24/v26/v28，v28的固定20字节尝试未解决错误13，已从后续实现移除。真实模块自报QUALCOMM/HC-05D/1.1.4，响应写多字节会报13但实际UART转发、电压/PID回包成立；无响应写未得到交付证据。后续实现使用严格DIS/服务属性范围和CMD7双向握手，只有已验证会话按该厂商行为处理13，未知设备和其他错误仍失败关闭。
+
+固件已获授权烧录、回读并运行，PID区保留；现场手机结果、边界与配对哈希以根目录`docs/HC05D_DEVICE_VALIDATION_20260924.md`为准，不使用前述部署前状态代替当前证据。`-VersionCode`与`-VersionName`可成对覆盖构建号，不能修改固定输入来升版本。
+
+2026-09-24阶段收尾：用户已离开设备，明确下次再做联动。已安装并读回校验v36自动连接诊断包，基础数据和PID回读/波形显示已验证；后台取消、启动横屏500ms稳定等待及目标地址限定已纳入回归。原始现场记录与后续限制仍以HC05D_DEVICE_VALIDATION_20260924.md为准。不要把150px中立区内的触摸尝试写成非零控制验收；现场未发出对应CMD3。

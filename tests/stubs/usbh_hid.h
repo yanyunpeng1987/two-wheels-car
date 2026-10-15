@@ -16,6 +16,12 @@ typedef enum {
 } USBH_StatusTypeDef;
 
 typedef enum {
+    HID_MOUSE = 1,
+    HID_KEYBOARD = 2,
+    HID_UNKNOWN = 255
+} HID_TypeTypeDef;
+
+typedef enum {
     HOST_IDLE = 0,
     HOST_CLASS_REQUEST,
     HOST_CLASS
@@ -29,6 +35,9 @@ typedef struct {
 
 typedef struct {
     USBH_DeviceDescTypeDef DevDesc;
+    uint8_t is_connected;
+    uint8_t is_disconnected;
+    uint8_t PortEnabled;
 } USBH_DeviceTypeDef;
 
 typedef struct {
@@ -39,11 +48,18 @@ typedef struct {
     USBH_DeviceTypeDef device;
     USBH_ClassTypeDef *pActiveClass;
     HOST_StateTypeDef gState;
+    uint32_t Timer;
 } USBH_HandleTypeDef;
+
+typedef struct {
+    uint16_t wItemLength;
+} HID_DescTypeDef;
 
 typedef struct {
     uint16_t length;
     uint8_t *pData;
+    HID_DescTypeDef HID_Desc;
+    USBH_StatusTypeDef (*Init)(USBH_HandleTypeDef *phost);
 } HID_HandleTypeDef;
 
 #endif /* TEST_STUB_USBH_HID_H */

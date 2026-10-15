@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "aa000240b183a8daeed3f09ca084cdf9335e0076",
+  "sourceBranch": "codex/mvtbot-ui-v22",
+  "files": [
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/DEVICE_VALIDATION.md",
+      "sha256": "bae418a9f8c4156f516bda5823bcffa6efe4629dbf4efe50ddb7d45ebf106db5"
+    },
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/README.md",
+      "sha256": "070438dab2fd29fa48a25d6f0267394d640909fb97a3b317144927f118bfe268"
+    },
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/VALIDATION.md",
+      "sha256": "0c71471791edf9c8ea4ca7c025a802cf576438987ecdc2af1645b23978399bab"
+    },
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/patch.json",
+      "sha256": "953db3d574a712fa707e11ba192c28d59f3758f8c80f3a2808016a423e9e1eef"
+    },
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/review.patch",
+      "sha256": "285073844adb2210e88e53808a662db2b4c8eea5112694d45b197416185a21d9"
+    },
+    {
+      "path": "Android/MVTBOT/changes/APP-UI-001/verify_release.py",
+      "sha256": "f698667d7d294c4a943d1b966469170671267c23191269b73a7099f9653b7e77"
+    },
+    {
+      "path": "Android/MVTBOT/tools/Apply-UiPatch.py",
+      "sha256": "fa87cf943f5f93ece4973e985c76cda1c960ab2ce1aea381a7b784f3a677f9f6"
+    },
+    {
+      "path": "Android/MVTBOT/tools/test_ui_patch.py",
+      "sha256": "40a4430eb6d213138bfa65741cb22d22d97ae3aca939cde0ad346e184cdd4498"
+    }
+  ]
+}

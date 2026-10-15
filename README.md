@@ -1,10 +1,24 @@
 # BalanceCar 两轮自平衡小车
 
+2026-10-15开发资料维护快照：本次整合HC-05D/APP v40及新手柄r5源码、验证和交付规范；源码整合状态见[版本矩阵](docs/RELEASE_MATRIX.md)，历史设备验收按各自版本保留。
+
+最终固件统一存放于项目旁 `BalanceCar-Deliveries`，日常取用请看[固件交付入口](docs/FIRMWARE_DELIVERY.md)；当前推荐r5，历史r2/r3保留，各版有修改记录与SHA256校验。
+
+2026-10-14新九字节手柄r5已完成适配、烧录及单只手柄12项车端输入台架检查。接收器需持续读取辅助IN83，r5增加丢弃式辅助服务及独立DWT每路500ms/USB身份状态门禁；105483项主机断言、Keil及两次运行后Flash/PID复核通过。实测四向请求±15/±160、回中、按键档位及关机归零；重新开机后回中，档位恢复3/2。全程flagMove=0，不代表物理行驶或停车验收；其余4只只有描述符一致证据。见[r5记录](docs/releases/2026-10-14-gamepad-r5.md)、[诊断历史](docs/releases/2026-10-13-new9-gamepad.md)。
+
+2026-10-14后续用户反馈：“我实测也是OK了”。当前这只新型号手柄的r5适配记为用户实测通过；未操作的其他样本与专项保持原验证范围。
+
+双手柄扩展r3已烧录：同一对任意一只可用，同一时刻一只独占，当前回中松键后另一只回中再操作可接管，提前推住不排队。车端两只独立输入、冲突隔离、held交接和关机归零已取得数据，PID完整保留；实际行驶待复测。自动页时序评分与逐帧功能结果分开保留，见[双手柄验证记录](docs/releases/2026-10-08-twin-dual.md)。当前工程79个活动输入。
+
+2026-10-08新2.4G Twin USB Joystick单只适配已烧录r2：PC表现为 `0810:0001`，车端实测为 `20BC:5500` 的独立八字节格式；车端固定接口0，左杆前后、右杆按实测水平轴转向。MCU接收、四向控制请求、回中/关机归零及Flash/PID回读通过，实际行驶待复测。见[设备记录](docs/devices/0810-0001.md)及[现场烧录记录](docs/releases/2026-10-08-twin0810-flash.md)；旧20BC九字节适配仍暂停。
+
 统一维护两轮自平衡小车的 **STM32F401RB 固件与 MVTBOT Android 控制应用**。设备端基于幻尔科技 MiniBalan；Keil 与 VS Code **共用同一个 `.uvprojx`、Arm Compiler 6.16、源码清单和链接脚本**。
 
-持续迭代从 [开发文档入口](docs/README.md) 开始：[需求台账](docs/REQUIREMENTS.md)、[通信协议](docs/PROTOCOL.md)、[版本与联调矩阵](docs/RELEASE_MATRIX.md)。Android 入口为 [Android/MVTBOT](Android/MVTBOT/README.md)，当前是 v21 Apktool 派生工程，尚无原始 Android Studio 源码；新克隆需另外恢复本地输入，不能只凭 GitHub 重建 APK。
+持续迭代从 [开发文档入口](docs/README.md) 开始：[需求台账](docs/REQUIREMENTS.md)、[通信协议](docs/PROTOCOL.md)、[版本与联调矩阵](docs/RELEASE_MATRIX.md)。Android 入口为 [Android/MVTBOT](Android/MVTBOT/README.md)，以 v21 Apktool 派生工程作为不可变输入，当前已安装版本为 v40；尚无原始 Android Studio 源码；新克隆需另外恢复本地输入，不能只凭 GitHub 重建 APK。
 
-GitHub：[yanyunpeng1987/two-wheels-car](https://github.com/yanyunpeng1987/two-wheels-car)（私有）。初始源码基线标签：`v0.1.0`；这不改变固件内部版本号。
+GitHub：[yanyunpeng1987/two-wheels-car](https://github.com/yanyunpeng1987/two-wheels-car)（2026-10-15 API核实为公开仓库；本次保持现有可见性）。初始源码基线标签：`v0.1.0`；这不改变固件内部版本号。
+
+2026-09-28已安装的MVTBOT APK40与当时HC-05D配套固件获用户基本测试通过；对应源码、APP业务补丁、构建工具和验证摘要从 `codex/hc05d-ble-reliability` 纳入本次 `codex/development-sync-20261015` 整合。[当前APK版本显示与安装记录](docs/APP_VERSION_INFO_20260928.md)、[蓝牙及MCU部署记录](docs/HC05D_DEPLOYMENT_20260928.md)记录完整产物哈希和测试范围。APK原始输入、签名、成品与原始设备日志按既有规则本地保存。当前固件推荐为后续r5；手柄升级未新增APP或蓝牙整车联调验收，不能将9月配对结果直接外推到APK40＋r5全部场景。
 
 新电脑先克隆仓库并安装下文所列工具：
 
@@ -13,11 +27,7 @@ git clone https://github.com/yanyunpeng1987/two-wheels-car.git Two-wheels-Car
 cd Two-wheels-Car
 ```
 
-`Two-wheels-Car` 是本地目录名，GitHub 仓库名为 `two-wheels-car`，所有者为 `yanyunpeng1987`。2026-09-28 已完成仓库重命名；现有克隆执行以下命令更新地址，本地目录无需改名：
-
-```powershell
-git remote set-url origin https://github.com/yanyunpeng1987/two-wheels-car.git
-```
+`Two-wheels-Car` 是本地目录名；GitHub仓库已更名为 `two-wheels-car`，上面的链接和克隆地址已同步。已保存的编辑器和Codex项目入口应指向实际本地路径。
 
 仓库包含设备固件构建必需的源码和依赖；原始 `MiniBalan/` 包仅保留在原工作区，不随 Git 上传，设备端新克隆也不需要它。Android 原包、派生输入、APK、原始日志及签名材料按模块说明分别保管。
 
@@ -84,7 +94,7 @@ python tools/verify_project.py --artifacts
 
 USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [手柄兼容性说明](docs/GAMEPAD_COMPATIBILITY.md)。
 
-`20BC:5500` 接收器使用独立的 9 字节解析，当前固定接口 0；原配手柄保持原格式解析。纯 C 报文解析、保护/停机诊断及电池监测模块均已加入 Keil 工程，当前编译输入为 77 个。已打开的 Keil 工程需重新加载项目文件以看到新增模块。
+0810配置使用8字节带ID解析，按ID1/2分流；八字节20BC及本次新九字节profile4同时接收接口0/1，以仲裁模块决定唯一控制权。旧profile1和legacy解码分支保留；满足20BC/bcd1003、64/123元数据的旧九字节实体也会选profile4，不能据此宣称旧硬件行为不变。报文解析、仲裁、保护/停机诊断、电池监测及HC-05D模块均已加入Keil工程，当前编译输入79个。
 
 设备端后续修改 `Firmware/`；APP 从 `Android/MVTBOT/` 开始。新增 `.c` 文件时在 **Keil 工程组中添加**，然后运行 `Project: Sync IntelliSense`；两套环境都依据 Keil 文件清单编译。不要把磁盘上存在但未加入工程的文件当成已编译模块。
 
@@ -113,4 +123,8 @@ USB 手柄型号放行范围、仍需匹配的报文布局及复测方法见 [�
 
 MVTBOT 的 APK、重建输入、原始拆分包、反编译参考、蓝牙闪退原始日志和 Android 环境记录已归入 [Android/MVTBOT](Android/MVTBOT/README.md)。项目级入口见 [APP 开发资料索引](docs/ANDROID_MVTBOT.md)。
 
-当前 APP 基线为 v21（2.3.6-mvtbot.2，MVTBOT 图标版）；蓝牙 NUL 解析闪退仍待结合设备端日志分析，未因资料合并而修复。设备端继续编辑 Firmware/；APP 的本地重建和签名脚本不执行手机安装或固件下载。原始包、派生工程与证据按现有仓库约定本地保存，文档和脚本可统一管理。
+APP不可变输入基线为v21，当前默认构建及已安装版本为v40（2.3.6-mvtbot.13-hc05d）。完整帧/异常数值防闪退、会话与权限修复已实现并部署；历史NUL的上游来源仍未确定，完整失联、反复重连与长时回归保持待验证。设备端继续编辑 Firmware/；APP 的本地重建和签名脚本不执行手机安装或固件下载。原始包、派生工程与证据按现有仓库约定本地保存，文档和脚本可统一管理。
+
+## HC-05D BLE 兼容开发
+
+独立兼容版本支持 HC-05D 的 E0FF 和原模块 FFE0，新增完整帧容错、DMA收发保护及100ms/500ms遥控失联契约。配置、构建、回退和实物验收见 [HC-05D兼容说明](docs/HC05D_COMPATIBILITY.md)，主机/构建证据见 [测试报告](docs/HC05D_TEST_REPORT.md)。新固件应与新APP配套使用；本地通过不代表已经安装、烧录或整车验收。

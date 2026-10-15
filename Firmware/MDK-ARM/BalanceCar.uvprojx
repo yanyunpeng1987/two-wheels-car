@@ -730,6 +730,11 @@
               <FilePath>..\BSP\bluetooth.c</FilePath>
             </File>
             <File>
+              <FileName>bluetooth_link.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bluetooth_link.c</FilePath>
+            </File>
+            <File>
               <FileName>buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\BSP\buzzer.c</FilePath>
@@ -788,6 +793,11 @@
               <FileName>gamepad_report.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hiwonder\src\gamepad_report.c</FilePath>
+            </File>
+            <File>
+              <FileName>gamepad_arbiter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Hiwonder\src\gamepad_arbiter.c</FilePath>
             </File>
             <File>
               <FileName>gamepad_handle.c</FileName>
